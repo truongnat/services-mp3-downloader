@@ -1,10 +1,10 @@
 # Music Playlist Downloader
 
-A modern web application built with Next.js that allows users to download entire music playlists from SoundCloud and YouTube as MP3 files.
+A modern web application built with Next.js that allows users to download entire music playlists from SoundCloud as MP3 files.
 
 ## Features
 
-- **Multi-Platform Support**: Download playlists from both SoundCloud and YouTube
+- **SoundCloud Support**: Download playlists from SoundCloud
 - **Batch Downloads**: Download entire playlists or individual tracks
 - **Real-time Progress**: Track download progress for each song
 - **Modern UI**: Clean, responsive interface built with Tailwind CSS and Radix UI
@@ -19,20 +19,12 @@ A modern web application built with Next.js that allows users to download entire
 - Progressive audio format support
 - Automatic metadata extraction
 
-### YouTube
-- Public playlists
-- Audio extraction from video content
-- Multiple quality options
-- Proxy-based streaming for CORS compliance
-
 ## Tech Stack
 
 - **Framework**: Next.js 15 with App Router
 - **UI Components**: Radix UI primitives with Tailwind CSS
 - **Audio Processing**: 
-  - `@distube/ytdl-core` for YouTube
   - `soundcloud.ts` for SoundCloud
-  - `ffmpeg-static` for audio conversion
 - **TypeScript**: Full type safety
 - **Runtime**: Node.js with Turbopack for development
 
@@ -84,17 +76,9 @@ bun dev
 
 ### SoundCloud Playlists
 
-1. Navigate to the SoundCloud tab
-2. Paste a SoundCloud playlist URL (e.g., `https://soundcloud.com/user/sets/playlist-name`)
-3. Click "Lấy playlist" to fetch the playlist information
-4. Choose to download individual tracks or the entire playlist
-
-### YouTube Playlists
-
-1. Navigate to the YouTube tab
-2. Paste a YouTube playlist URL (e.g., `https://www.youtube.com/playlist?list=...`)
-3. Click the fetch button to load the playlist
-4. Select tracks to download as MP3 files
+1. Paste a SoundCloud playlist URL (e.g., `https://soundcloud.com/user/sets/playlist-name`)
+2. Click "Lấy playlist" to fetch the playlist information
+3. Choose to download individual tracks or the entire playlist
 
 ## API Endpoints
 
@@ -103,20 +87,13 @@ bun dev
 - **Parameters**: `url` (playlist URL)
 - **Description**: Fetches SoundCloud playlist information and track metadata
 
-### `/api/youtube/proxy`
-- **Method**: GET
-- **Parameters**: `videoId`, `itag`
-- **Description**: Proxies YouTube audio streams for client-side download
-
 ## Project Structure
 
 ```
 ├── app/                          # Next.js App Router
 │   ├── api/                      # API routes
 │   │   ├── playlist/             # SoundCloud playlist API
-│   │   └── youtube/              # YouTube proxy API
 │   ├── PlaylistDownloaderSoundCloud.tsx
-│   ├── PlaylistDownloaderYouTube.tsx
 │   └── page.tsx                  # Main application page
 ├── components/                   # Reusable UI components
 │   └── ui/                       # Shadcn/ui components
@@ -135,13 +112,11 @@ bun dev
 - Prevention of accidental page closure during downloads
 
 ### User Experience
-- Tab switching disabled during active downloads
 - Real-time progress indicators
 - Responsive design for mobile and desktop
 - Clean, intuitive interface
 
 ### Technical Features
-- CORS-compliant proxy for YouTube streams
 - Client-side audio processing
 - Automatic file naming and metadata
 - Rate limiting protection for API calls
@@ -173,7 +148,7 @@ Create a `.env.local` file for local development:
 
 ## Legal Notice
 
-This application is for educational and personal use only. Users are responsible for complying with the terms of service of SoundCloud and YouTube, as well as applicable copyright laws. Only download content you have the right to download.
+This application is for educational and personal use only. Users are responsible for complying with the terms of service of SoundCloud, as well as applicable copyright laws. Only download content you have the right to download.
 
 ## License
 
@@ -184,9 +159,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ### Common Issues
 
 1. **Downloads not starting**: Check if the playlist URL is public and accessible
-2. **CORS errors**: The application uses proxy endpoints to handle CORS restrictions
-3. **Rate limiting**: Built-in retry mechanisms handle temporary API limits
-4. **Large playlists**: SoundCloud downloads are limited to 50 tracks for performance
+2. **Rate limiting**: Built-in retry mechanisms handle temporary API limits
+3. **Large playlists**: SoundCloud downloads are limited to 50 tracks for performance
 
 ### Browser Compatibility
 
@@ -200,6 +174,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Next.js](https://nextjs.org/) for the React framework
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 - [Radix UI](https://www.radix-ui.com/) for accessible components
-- [ytdl-core](https://github.com/fent/node-ytdl-core) for YouTube integration
-- [soundcloud.ts](https://github.com/Tenpi/soundcloud.ts) for SoundCloud API# services-mp3-downloader
-# services-mp3-downloader
+- [soundcloud.ts](https://github.com/Tenpi/soundcloud.ts) for SoundCloud API
