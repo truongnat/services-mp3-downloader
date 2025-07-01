@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - ffmpeg-static
+  - sharp
+  - unrs-resolver
+  - ytdlp-nodejs
