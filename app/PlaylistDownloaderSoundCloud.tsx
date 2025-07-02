@@ -42,19 +42,36 @@ interface PlaylistDownloaderSoundCloudProps {
   setDisableTabs?: (v: boolean) => void;
 }
 
+
 export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: PlaylistDownloaderSoundCloudProps) {
-  const [url, setUrl] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [playlistInfo, setPlaylistInfo] = useState<SoundCloudPlaylistInfo | null>(null)
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [playlistInfo, setPlaylistInfo] = useState<SoundCloudPlaylistInfo | null>(null);
   // Refactor: mỗi track có status và progress riêng
   const [tracks, setTracks] = useState<(
     SoundCloudTrackInfo & {
-      status?: "idle" | "downloading" | "done" | "error"
-      progress?: number
+      status?: "idle" | "downloading" | "done" | "error";
+      progress?: number;
     }
-  )[]>([])
-  const [globalStatus, setGlobalStatus] = useState<"idle"|"downloading"|"done"|"error">("idle")
+  )[]>([]);
+  const [globalStatus, setGlobalStatus] = useState<"idle"|"downloading"|"done"|"error">("idle");
+  // New: Detect playlist vs track in real-time
+  const [isPlaylist, setIsPlaylist] = useState<boolean | null>(null);
+
+  // Detect playlist/track on URL change
+  useEffect(() => {
+    if (!url) {
+      setIsPlaylist(null);
+      return;
+    }
+    try {
+      const urlObj = new URL(url);
+      setIsPlaylist(urlObj.pathname.includes("/sets/"));
+    } catch {
+      setIsPlaylist(null);
+    }
+  }, [url]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,9 +175,15 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       <div className="relative">
         <Input
           type="url"
-          placeholder="Enter SoundCloud playlist URL"
+          placeholder="Nhập link SoundCloud playlist hoặc bài hát"
           value={url}
-          onChange={e => setUrl(e.target.value)}
+          onChange={e => {
+            setUrl(e.target.value);
+            setError("");
+            setPlaylistInfo(null);
+            setTracks([]);
+            setGlobalStatus("idle");
+          }}
           required
           disabled={loading || tracks.some(t => t.status === "downloading")}
           className="pr-10"
@@ -179,7 +202,14 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
         )}
       </div>
       <Button className="w-full" type="submit" disabled={loading || !url || tracks.some(t => t.status === "downloading")}> 
-        {loading ? "Đang lấy playlist..." : "Lấy playlist"}
+        {loading
+          ? (isPlaylist === false ? "Đang lấy bài hát..." : "Đang lấy playlist...")
+          : (isPlaylist === null
+              ? "Lấy thông tin"
+              : isPlaylist
+                ? "Lấy playlist"
+                : "Tải bài hát")
+        }
       </Button>
       {playlistInfo && (
         <div className="rounded-lg border bg-card p-4 flex gap-4 items-center mb-4">
