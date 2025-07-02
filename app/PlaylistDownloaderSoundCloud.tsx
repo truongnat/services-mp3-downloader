@@ -186,7 +186,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
           }}
           required
           disabled={loading || tracks.some(t => t.status === "downloading")}
-          className="pr-10"
+          className="pr-10 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 focus:outline-none"
         />
         {url && !loading && (
           <button
