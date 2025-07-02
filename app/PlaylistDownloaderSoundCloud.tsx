@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import PlaylistTrackCard from "./PlaylistTrackCard"
-import "./playlistdownloader.mobile.css"
+// import "./playlistdownloader.mobile.css"
 import Image from "next/image"
 import { SoundCloudPlaylistApiResponse, SoundCloudPlaylistInfo, SoundCloudTrackInfo } from "@/types/soundcloud"
 
@@ -171,7 +171,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
   }, [tracks]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-lg w-full mx-auto px-4 sm:px-0">
       <div className="relative">
         <Input
           type="url"
@@ -212,16 +212,16 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
         }
       </Button>
       {playlistInfo && (
-        <div className="rounded-lg border bg-card p-4 flex gap-4 items-center mb-4">
+        <div className="rounded-lg border bg-card p-4 flex flex-col sm:flex-row gap-4 items-center mb-4">
           {playlistInfo.artwork ? (
             <Image src={playlistInfo.artwork} alt={playlistInfo.title} width={64} height={64} className="rounded shadow" />
           ) : null}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full sm:w-auto">
             <div className="font-bold text-lg truncate" title={playlistInfo.title}>{playlistInfo.title}</div>
             <div className="text-xs text-muted-foreground truncate" title={playlistInfo.description}>{playlistInfo.description}</div>
             <div className="text-xs mt-1">Tracks: {playlistInfo.tracksCount}</div>
           </div>
-          <div className="flex flex-col gap-2 items-end">
+          <div className="flex flex-row sm:flex-col gap-2 items-end w-full sm:w-auto justify-end sm:justify-end">
             <Button size="sm" onClick={handleDownloadAll} disabled={globalStatus === "downloading" || tracks.length === 0 || tracks.every(t => t.status === "done")}> 
               {globalStatus === "idle" && "Download all"}
               {globalStatus === "downloading" && "Downloading..."}
@@ -233,11 +233,11 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
           </div>
         </div>
       )}
-      {error && <div className="text-red-500 text-sm">{error}</div>}
+      {error && <div className="text-red-500 text-sm break-words max-w-full">{error}</div>}
       {tracks.length > 0 && (
         <div className="mt-4">
           <div className="font-semibold mb-2">Track list:</div>
-          <div>
+          <div className="flex flex-col gap-2">
             {tracks.map((track, idx) => (
               <PlaylistTrackCard
                 key={track.id}
