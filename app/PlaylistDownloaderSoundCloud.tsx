@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import PlaylistTrackCard from "./PlaylistTrackCard"
+import "./playlistdownloader.mobile.css"
 import Image from "next/image"
 import { SoundCloudPlaylistApiResponse, SoundCloudPlaylistInfo, SoundCloudTrackInfo } from "@/types/soundcloud"
 
