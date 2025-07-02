@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
 import { useState } from "react";
-import PlaylistDownloaderYouTube from "./PlaylistDownloaderYouTube";
 import PlaylistDownloaderSoundCloud from "./PlaylistDownloaderSoundCloud";
 
 export default function Home() {
@@ -63,7 +62,7 @@ export default function Home() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <PlaylistDownloaderYouTube />
+                <></>
               </CardContent>
               <CardFooter className="text-sm text-muted-foreground">
                 Supported format: YouTube playlist URLs
