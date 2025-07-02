@@ -64,7 +64,9 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     setPlaylistInfo(null);
     setGlobalStatus("idle");
     try {
-      if (url.includes("/sets/")) {
+      // Chỉ check /sets/ trong path, không check query string
+      const urlObj = new URL(url);
+      if (urlObj.pathname.includes("/sets/")) {
         // Playlist flow như cũ
         const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
         if (!res.ok) throw new Error("Không lấy được playlist từ API!");
