@@ -81,7 +81,6 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     setPlaylistInfo(null);
     setGlobalStatus("idle");
     try {
-      // Chỉ check /sets/ trong path, không check query string
       const urlObj = new URL(url);
       if (urlObj.pathname.includes("/sets/")) {
         // Playlist flow như cũ
@@ -91,13 +90,13 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
         setPlaylistInfo({ ...data.playlistInfo });
         setTracks(data.tracks.map(track => ({ ...track, status: "idle", progress: 0 })));
       } else {
-        // Track đơn lẻ
-        const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
-        if (!res.ok) throw new Error("Không lấy được track từ API!");
-        const data: SoundCloudPlaylistApiResponse = await res.json();
-        if (!data.tracks || data.tracks.length === 0) throw new Error("Không tìm thấy bài hát");
+        // Track đơn lẻ: dùng API mới
+        const res = await fetch(`/api/track?url=${encodeURIComponent(url)}`);
+        if (!res.ok) throw new Error("Không lấy được thông tin bài hát từ API!");
+        const data = await res.json();
+        if (!data.track) throw new Error("Không tìm thấy bài hát");
         setPlaylistInfo(null);
-        setTracks([ { ...data.tracks[0], status: "idle", progress: 0 } ]);
+        setTracks([{ ...data.track, status: "idle", progress: 0 }]);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
