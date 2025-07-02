@@ -23,3 +23,7 @@ export interface SoundCloudPlaylistApiResponse {
   playlistInfo: SoundCloudPlaylistInfo;
   tracks: SoundCloudTrackInfo[];
 }
+
+export interface SoundCloudTrackApiResponse {
+  track: SoundCloudTrackInfo;
+}

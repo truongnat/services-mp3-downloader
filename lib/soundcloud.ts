@@ -189,3 +189,46 @@ export async function downloadAllTracks(tracks: SoundcloudTrack[]): Promise<(str
   }
   return results;
 }
+
+// Resolve single track info from URL
+export async function resolveTrack(url: string) {
+  try {
+    const clean = cleanUrl(url);
+    // 1. Resolve track bằng soundcloud.ts
+    const track = await retry(() => sc.tracks.get(clean) as Promise<SoundcloudTrack>, 2, 500);
+    if (!track || track.kind !== "track") {
+      throw new Error("URL không phải bài hát hợp lệ");
+    }
+    // 2. Map track info (thêm streamUrl thực sự)
+    let streamUrl: string | null = null;
+    try {
+      if (track.media && Array.isArray(track.media.transcodings)) {
+        const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+        if (progressive) {
+          const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            streamUrl = data.url || null;
+          }
+        }
+      }
+    } catch {}
+    return {
+      id: String(track.id),
+      title: track.title,
+      artist: track.user?.username || "",
+      duration: track.duration,
+      artwork: track.artwork_url || "",
+      url: track.permalink_url,
+      streamUrl,
+      size: undefined,
+      bitrate: undefined,
+      format: undefined,
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[SoundCloud API error]", err);
+    throw err;
+  }
+}
