@@ -65,7 +65,7 @@ export async function resolvePlaylist(url: string): Promise<PlaylistApiResponse>
     // 1. Resolve playlist bằng soundcloud.ts, ép kiểu rõ ràng
     const playlist = await retry(() => sc.playlists.get(clean) as Promise<SoundcloudPlaylist>, 2, 500);
     if (!playlist || playlist.kind !== "playlist" || !Array.isArray(playlist.tracks)) {
-      throw new Error("URL không phải playlist hợp lệ");
+      throw new Error("URL is not a valid playlist");
     }
     // 2. Map playlist info
     const playlistInfo: PlaylistInfo = {
@@ -197,7 +197,7 @@ export async function resolveTrack(url: string) {
     // 1. Resolve track bằng soundcloud.ts
     const track = await retry(() => sc.tracks.get(clean) as Promise<SoundcloudTrack>, 2, 500);
     if (!track || track.kind !== "track") {
-      throw new Error("URL không phải bài hát hợp lệ");
+      throw new Error("URL is not a valid track");
     }
     // 2. Map track info (thêm streamUrl thực sự)
     let streamUrl: string | null = null;

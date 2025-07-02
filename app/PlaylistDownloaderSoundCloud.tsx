@@ -9,7 +9,7 @@ import { SoundCloudPlaylistApiResponse, SoundCloudPlaylistInfo, SoundCloudTrackI
 // Hàm download mp3 từ streamUrl cho client
 async function downloadMp3FromStreamUrl(streamUrl: string, title: string, onProgress?: (percent: number) => void) {
   const audioRes = await fetch(streamUrl);
-  if (!audioRes.ok || !audioRes.body) throw new Error("Không tải được file mp3");
+  if (!audioRes.ok || !audioRes.body) throw new Error("Failed to download mp3 file");
   const contentLength = audioRes.headers.get("Content-Length");
   const total = contentLength ? parseInt(contentLength, 10) : 0;
   const reader = audioRes.body.getReader();
@@ -85,16 +85,16 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       if (urlObj.pathname.includes("/sets/")) {
         // Playlist flow như cũ
         const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
-        if (!res.ok) throw new Error("Không lấy được playlist từ API!");
+        if (!res.ok) throw new Error("Failed to fetch playlist from API!");
         const data: SoundCloudPlaylistApiResponse = await res.json();
         setPlaylistInfo({ ...data.playlistInfo });
         setTracks(data.tracks.map(track => ({ ...track, status: "idle", progress: 0 })));
       } else {
         // Track đơn lẻ: dùng API mới
         const res = await fetch(`/api/track?url=${encodeURIComponent(url)}`);
-        if (!res.ok) throw new Error("Không lấy được thông tin bài hát từ API!");
+        if (!res.ok) throw new Error("Failed to fetch track info from API!");
         const data = await res.json();
-        if (!data.track) throw new Error("Không tìm thấy bài hát");
+        if (!data.track) throw new Error("Track not found");
         setPlaylistInfo(null);
         setTracks([{ ...data.track, status: "idle", progress: 0 }]);
       }
@@ -102,7 +102,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("Lỗi không xác định");
+        setError("Unknown error");
       }
     } finally {
       setLoading(false);
@@ -114,7 +114,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     setTracks(tracks => tracks.map((t, i) => i === idx ? { ...t, status: "downloading", progress: 0 } : t))
     try {
       const track = tracks[idx];
-      if (!track.streamUrl) throw new Error("Không có streamUrl cho bài hát này!");
+      if (!track.streamUrl) throw new Error("No streamUrl for this track!");
       console.log("[DEBUG] Bắt đầu tải:", track.title, track.streamUrl);
       await downloadMp3FromStreamUrl(track.streamUrl, track.title, (percent) => {
         setTracks(tracks => tracks.map((t, i) => i === idx ? { ...t, progress: percent } : t))
@@ -137,7 +137,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       setTracks(tracks => tracks.map((t, idx) => idx === i ? { ...t, status: "downloading", progress: 0 } : t));
       try {
         const track = tracks[i];
-        if (!track.streamUrl) throw new Error("Không có streamUrl cho bài hát này!");
+        if (!track.streamUrl) throw new Error("No streamUrl for this track!");
         await downloadMp3FromStreamUrl(track.streamUrl, track.title, (percent) => {
           setTracks(tracks => tracks.map((t, idx) => idx === i ? { ...t, progress: percent } : t))
         });
@@ -161,7 +161,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     const handler = (e: BeforeUnloadEvent) => {
       if (isDownloading) {
         e.preventDefault();
-        e.returnValue = "Bạn có chắc muốn rời trang? Nhạc đang được tải!";
+        e.returnValue = "Are you sure you want to leave? Music is being downloaded!";
         return e.returnValue;
       }
     };
@@ -174,7 +174,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       <div className="relative">
         <Input
           type="url"
-          placeholder="Nhập link SoundCloud playlist hoặc bài hát"
+          placeholder="Enter SoundCloud playlist or track URL"
           value={url}
           onChange={e => {
             setUrl(e.target.value);
@@ -202,12 +202,12 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       </div>
       <Button className="w-full" type="submit" disabled={loading || !url || tracks.some(t => t.status === "downloading")}> 
         {loading
-          ? (isPlaylist === false ? "Đang lấy bài hát..." : "Đang lấy playlist...")
+          ? (isPlaylist === false ? "Fetching track..." : "Fetching playlist...")
           : (isPlaylist === null
-              ? "Lấy thông tin"
+              ? "Fetch info"
               : isPlaylist
-                ? "Lấy playlist"
-                : "Tải bài hát")
+                ? "Fetch playlist"
+                : "Download track")
         }
       </Button>
       {playlistInfo && (
@@ -218,16 +218,16 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
           <div className="flex-1 min-w-0">
             <div className="font-bold text-lg truncate" title={playlistInfo.title}>{playlistInfo.title}</div>
             <div className="text-xs text-muted-foreground truncate" title={playlistInfo.description}>{playlistInfo.description}</div>
-            <div className="text-xs mt-1">Số bài hát: {playlistInfo.tracksCount}</div>
+            <div className="text-xs mt-1">Tracks: {playlistInfo.tracksCount}</div>
           </div>
           <div className="flex flex-col gap-2 items-end">
-            <Button size="sm" onClick={handleDownloadAll} disabled={globalStatus === "downloading" || tracks.length === 0 || tracks.every(t => t.status === "done")}>
-              {globalStatus === "idle" && "Tải tất cả"}
-              {globalStatus === "downloading" && "Đang tải..."}
-              {globalStatus === "done" && "Đã tải tất cả"}
+            <Button size="sm" onClick={handleDownloadAll} disabled={globalStatus === "downloading" || tracks.length === 0 || tracks.every(t => t.status === "done")}> 
+              {globalStatus === "idle" && "Download all"}
+              {globalStatus === "downloading" && "Downloading..."}
+              {globalStatus === "done" && "All downloaded"}
             </Button>
             {globalStatus === "downloading" && (
-              <span className="text-xs text-muted-foreground mt-1">Đang tải toàn bộ</span>
+              <span className="text-xs text-muted-foreground mt-1">Downloading all</span>
             )}
           </div>
         </div>
@@ -235,7 +235,7 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
       {error && <div className="text-red-500 text-sm">{error}</div>}
       {tracks.length > 0 && (
         <div className="mt-4">
-          <div className="font-semibold mb-2">Danh sách bài hát:</div>
+          <div className="font-semibold mb-2">Track list:</div>
           <div>
             {tracks.map((track, idx) => (
               <PlaylistTrackCard
