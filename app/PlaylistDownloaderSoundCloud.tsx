@@ -57,26 +57,37 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
   const [globalStatus, setGlobalStatus] = useState<"idle"|"downloading"|"done"|"error">("idle")
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-    setTracks([])
-    setPlaylistInfo(null)
-    setGlobalStatus("idle")
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setTracks([]);
+    setPlaylistInfo(null);
+    setGlobalStatus("idle");
     try {
-      const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`)
-      if (!res.ok) throw new Error("Không lấy được playlist từ API!")
-      const data: SoundCloudPlaylistApiResponse = await res.json()
-      setPlaylistInfo({ ...data.playlistInfo })
-      setTracks(data.tracks.map(track => ({ ...track, status: "idle", progress: 0 })))
+      if (url.includes("/sets/")) {
+        // Playlist flow như cũ
+        const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
+        if (!res.ok) throw new Error("Không lấy được playlist từ API!");
+        const data: SoundCloudPlaylistApiResponse = await res.json();
+        setPlaylistInfo({ ...data.playlistInfo });
+        setTracks(data.tracks.map(track => ({ ...track, status: "idle", progress: 0 })));
+      } else {
+        // Track đơn lẻ
+        const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
+        if (!res.ok) throw new Error("Không lấy được track từ API!");
+        const data: SoundCloudPlaylistApiResponse = await res.json();
+        if (!data.tracks || data.tracks.length === 0) throw new Error("Không tìm thấy bài hát");
+        setPlaylistInfo(null);
+        setTracks([ { ...data.tracks[0], status: "idle", progress: 0 } ]);
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message)
+        setError(err.message);
       } else {
-        setError("Lỗi không xác định")
+        setError("Lỗi không xác định");
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
