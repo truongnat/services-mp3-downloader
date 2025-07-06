@@ -82,10 +82,34 @@ bun dev
 
 ## API Endpoints
 
-### `/api/playlist`
+### SoundCloud APIs
+
+#### `/api/soundcloud/playlist`
 - **Method**: GET
 - **Parameters**: `url` (playlist URL)
 - **Description**: Fetches SoundCloud playlist information and track metadata
+
+#### `/api/soundcloud/track`
+- **Method**: GET
+- **Parameters**: `url` (track URL)
+- **Description**: Fetches SoundCloud track information and metadata
+
+### YouTube APIs
+
+#### `/api/youtube/track`
+- **Method**: GET
+- **Parameters**: `url` (audio URL)
+- **Description**: Fetches YouTube audio information and download metadata
+
+#### `/api/youtube/playlist`
+- **Method**: GET
+- **Parameters**: `url` (playlist URL)
+- **Description**: Fetches YouTube playlist information (coming soon)
+
+#### `/api/youtube/download`
+- **Method**: GET
+- **Parameters**: `url` (stream URL), `filename` (optional)
+- **Description**: Proxy endpoint for downloading YouTube audio files
 
 ## Project Structure
 
