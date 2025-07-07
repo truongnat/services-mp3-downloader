@@ -6,6 +6,7 @@ export interface SoundCloudPlaylistInfo {
   tracksCount: number;
 }
 
+
 export interface SoundCloudTrackInfo {
   id: string;
   title: string;
@@ -22,8 +23,4 @@ export interface SoundCloudTrackInfo {
 export interface SoundCloudPlaylistApiResponse {
   playlistInfo: SoundCloudPlaylistInfo;
   tracks: SoundCloudTrackInfo[];
-}
-
-export interface SoundCloudTrackApiResponse {
-  track: SoundCloudTrackInfo;
 }

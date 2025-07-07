@@ -25,10 +25,6 @@ export interface YouTubePlaylistApiResponse {
   tracks: YouTubeTrackInfo[];
 }
 
-export interface YouTubeTrackApiResponse {
-  track: YouTubeTrackInfo;
-}
-
 export interface YouTubeAudioOptions {
   id: string;
   quality?: 'max' | '1080' | '720' | '480' | '360' | '240' | '144';

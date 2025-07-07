@@ -1,74 +1,66 @@
-export interface JobProgress {
-  jobId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress: number; // 0-100
+// Job management utilities for background processing
+
+export interface Job {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
   message: string;
+  result?: unknown;
+  error?: string;
   totalItems?: number;
   processedItems?: number;
-  startTime: number;
-  endTime?: number;
-  result?: any;
-  error?: string;
+  createdAt: Date;
 }
 
 // In-memory job storage (in production, use Redis or database)
-const jobs = new Map<string, JobProgress>();
+const jobs = new Map<string, Job>();
 
-export function createJob(jobId: string, message: string = 'Starting job...'): JobProgress {
-  const job: JobProgress = {
-    jobId,
+export function generateJobId(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+export function createJob(id: string): Job {
+  const job: Job = {
+    id,
     status: 'pending',
     progress: 0,
-    message,
-    startTime: Date.now()
+    message: 'Job created',
+    createdAt: new Date()
   };
-  
-  jobs.set(jobId, job);
+  jobs.set(id, job);
   return job;
 }
 
-export function updateJob(jobId: string, updates: Partial<JobProgress>): JobProgress | null {
-  const job = jobs.get(jobId);
-  if (!job) return null;
-  
-  const updatedJob = { ...job, ...updates };
-  jobs.set(jobId, updatedJob);
-  return updatedJob;
+export function getJob(id: string): Job | undefined {
+  return jobs.get(id);
 }
 
-export function getJob(jobId: string): JobProgress | null {
-  return jobs.get(jobId) || null;
+export function updateJob(id: string, updates: Partial<Job>): Job | undefined {
+  const job = jobs.get(id);
+  if (job) {
+    Object.assign(job, updates);
+    jobs.set(id, job);
+  }
+  return job;
 }
 
-export function completeJob(jobId: string, result: any): JobProgress | null {
-  return updateJob(jobId, {
-    status: 'completed',
-    progress: 100,
-    message: 'Job completed successfully',
-    endTime: Date.now(),
-    result
-  });
+export function deleteJob(id: string): boolean {
+  return jobs.delete(id);
 }
 
-export function failJob(jobId: string, error: string): JobProgress | null {
-  return updateJob(jobId, {
-    status: 'failed',
-    progress: 0,
-    message: 'Job failed',
-    endTime: Date.now(),
-    error
-  });
+export function getAllJobs(): Job[] {
+  return Array.from(jobs.values());
 }
 
-// Cleanup old jobs (older than 1 hour)
-export function cleanupOldJobs() {
-  const oneHourAgo = Date.now() - (60 * 60 * 1000);
+// Clean up old jobs (older than 1 hour)
+export function cleanupOldJobs(): void {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   for (const [jobId, job] of jobs.entries()) {
-    if (job.endTime && job.endTime < oneHourAgo) {
+    if (job.createdAt < oneHourAgo) {
       jobs.delete(jobId);
     }
   }
 }
 
-// Auto cleanup every 30 minutes
-setInterval(cleanupOldJobs, 30 * 60 * 1000);
+// Auto cleanup every 10 minutes
+setInterval(cleanupOldJobs, 10 * 60 * 1000);

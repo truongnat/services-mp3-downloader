@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolvePlaylist } from "@/lib/youtube";
+import { resolvePlaylist } from "@/lib/youtube/youtube";
 
 export const runtime = "nodejs";
 

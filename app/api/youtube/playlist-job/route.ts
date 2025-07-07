@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { nanoid } from "nanoid";
-import { createJob } from "@/lib/job-manager";
-import { processYouTubePlaylistJob } from "@/lib/youtube-playlist-job";
+import { createPlaylistJob } from "@/lib/youtube/youtube-playlist-job";
 
 export const runtime = "nodejs";
 
@@ -25,19 +23,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid YouTube playlist URL" }, { status: 400 });
     }
 
-    // Create a new job
-    const jobId = nanoid();
-    const job = createJob(jobId, 'Playlist processing job created');
+    // Create and start playlist job
+    const jobId = await createPlaylistJob({ url });
 
-    // Start processing in background (don't await)
-    processYouTubePlaylistJob(jobId, playlistId).catch(error => {
-      console.error('Background job error:', error);
-    });
-
-    return NextResponse.json({ 
+    return NextResponse.json({
       jobId,
-      status: job.status,
-      message: job.message 
+      status: 'pending',
+      message: 'Playlist processing job created'
     });
 
   } catch (error) {

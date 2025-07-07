@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveTrack } from "@/lib/soundcloud";
+import { resolveTrack } from "@/lib/soundcloud/soundcloud";
 
 export const runtime = "nodejs";
 
@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   if (!url) {
     return NextResponse.json({ error: "Missing track URL" }, { status: 400 });
   }
+  
   try {
     const track = await resolveTrack(url);
     if (!track) throw new Error("Track not found");
