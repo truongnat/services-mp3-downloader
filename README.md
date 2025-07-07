@@ -440,7 +440,7 @@ We welcome contributions! Please follow these steps:
 
 1. **Fork the repository**
    ```bash
-   git clone https://github.com/your-username/services-mp3-downloader.git
+   git clone https://github.com/truongnat/services-mp3-downloader.git
    cd services-mp3-downloader
    ```
 
@@ -585,6 +585,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **Made with ❤️ for music lovers everywhere**
 
-[⭐ Star this repo](https://github.com/your-username/services-mp3-downloader) • [🐛 Report Bug](https://github.com/your-username/services-mp3-downloader/issues) • [💡 Request Feature](https://github.com/your-username/services-mp3-downloader/issues)
+[⭐ Star this repo](https://github.com/truongnat/services-mp3-downloader) • [🐛 Report Bug](https://github.com/truongnat/services-mp3-downloader/issues) • [💡 Request Feature](https://github.com/truongnat/services-mp3-downloader/issues)
 
 </div>
