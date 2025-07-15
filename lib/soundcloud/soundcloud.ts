@@ -2,7 +2,7 @@ import { SoundCloudPlaylistApiResponse, SoundCloudPlaylistInfo, SoundCloudTrackI
 import { Soundcloud } from "soundcloud.ts";
 import type { SoundcloudPlaylist, SoundcloudTrack } from "soundcloud.ts";
 
-const SOUNDCLOUD_CLIENT_ID = "1JEFtFgP4Mocy0oEGJj2zZ0il9pEpBrM";
+const SOUNDCLOUD_CLIENT_ID = "59BqQCyB9AWNYAglJEiHbp1h6keJHfrU";
 
 interface SoundCloudPlaylistApi {
   tracks: SoundcloudTrack[];
