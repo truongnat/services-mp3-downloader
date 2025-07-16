@@ -108,15 +108,27 @@ export async function saveFile(
   filename: string,
   onMacOSDownload?: () => void
 ): Promise<void> {
-  // Direct download to default location
+  // Direct download to default location - no dialogs
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+  
+  // Set all necessary attributes to prevent dialogs
   a.href = url;
   a.download = filename;
+  a.style.display = 'none';
+  a.target = '_self';
+  
+  // Append, click, and clean up quickly
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  
+  // Clean up immediately to prevent any interference
+  setTimeout(() => {
+    if (document.body.contains(a)) {
+      document.body.removeChild(a);
+    }
+    URL.revokeObjectURL(url);
+  }, 100);
 
   // Detect macOS and show tip
   const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
