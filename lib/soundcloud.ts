@@ -60,7 +60,7 @@ export async function resolveTrack(url: string) {
 }
 
 export async function getTrackDownloadUrl(track: SoundCloudTrackInfo) {
-  const streamUrl = await soundcloud.util.streamLink(track);
+  const streamUrl = await soundcloud.util.streamLink(track.id);
   if (!streamUrl)
     throw new Error(
       `Could not get stream URL for track: ${track.title}. The track may not be available for streaming or downloading.`
