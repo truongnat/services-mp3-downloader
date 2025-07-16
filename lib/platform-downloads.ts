@@ -8,6 +8,7 @@ export async function downloadYouTubeTrack(
   index: number,
   settings: AudioSettings,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
 
@@ -16,7 +17,7 @@ export async function downloadYouTubeTrack(
 
   try {
     const blob = await downloadWithProgress(proxyUrl, onProgress);
-    await saveFile(blob, filename);
+    await saveFile(blob, filename, onMacOSDownload);
   } catch (error) {
     console.error('YouTube download error:', error);
     throw error;
@@ -29,13 +30,14 @@ export async function downloadSoundCloudTrack(
   index: number,
   settings: AudioSettings,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
 
   try {
     // Direct download from SoundCloud stream URL
     const blob = await downloadWithProgress(track.streamUrl, onProgress);
-    await saveFile(blob, filename);
+    await saveFile(blob, filename, onMacOSDownload);
   } catch (error) {
     console.error('SoundCloud download error:', error);
     throw error;
@@ -49,12 +51,13 @@ export async function downloadTrack(
   settings: AudioSettings,
   platform: 'youtube' | 'soundcloud',
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
 ): Promise<void> {
   switch (platform) {
     case 'youtube':
-      return downloadYouTubeTrack(track, index, settings, onProgress);
+      return downloadYouTubeTrack(track, index, settings, onProgress, onMacOSDownload);
     case 'soundcloud':
-      return downloadSoundCloudTrack(track, index, settings, onProgress);
+      return downloadSoundCloudTrack(track, index, settings, onProgress, onMacOSDownload);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -68,6 +71,7 @@ export async function downloadTracks(
   onTrackProgress?: (trackIndex: number, progress: { percent: number; loaded: number; total: number }) => void,
   onTrackComplete?: (trackIndex: number) => void,
   onTrackError?: (trackIndex: number, error: Error) => void,
+  onMacOSDownload?: () => void,
   maxConcurrent: number = 3
 ): Promise<void> {
   const downloadPromises: Promise<void>[] = [];
@@ -88,6 +92,7 @@ export async function downloadTracks(
             settings,
             platform,
             (progress) => onTrackProgress?.(i, progress),
+            onMacOSDownload
           );
           
           completedDownloads++;
