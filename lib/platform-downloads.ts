@@ -1,4 +1,4 @@
-import { CommonTrackInfo, downloadWithProgress, saveFile, saveFileWithConfirmation, generateFilename } from "@/lib/download-utils";
+import { CommonTrackInfo, downloadWithProgress, saveFile, generateFilename } from "@/lib/download-utils";
 export type { DownloadProgress } from "@/lib/download-utils";
 import { AudioSettings } from "@/lib/settings";
 
@@ -87,7 +87,6 @@ export async function downloadSoundCloudTrackWithConfirmation(
   track: CommonTrackInfo,
   index: number,
   settings: AudioSettings,
-  useCustomLocation: boolean,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
@@ -95,7 +94,7 @@ export async function downloadSoundCloudTrackWithConfirmation(
   try {
     // Direct download from SoundCloud stream URL
     const blob = await downloadWithProgress(track.streamUrl, onProgress);
-    await saveFileWithConfirmation(blob, filename, useCustomLocation);
+    await saveFile(blob, filename);
   } catch (error) {
     console.error('SoundCloud download error:', error);
     throw error;
@@ -108,14 +107,13 @@ export async function downloadTrackWithConfirmation(
   index: number,
   settings: AudioSettings,
   platform: 'youtube' | 'soundcloud',
-  useCustomLocation: boolean,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
 ): Promise<void> {
   switch (platform) {
-    case 'youtube':
-      return downloadYouTubeTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress);
+   case 'youtube':
+      return downloadYouTubeTrack(track, index, settings, onProgress);
     case 'soundcloud':
-      return downloadSoundCloudTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress);
+      return downloadSoundCloudTrack(track, index, settings, onProgress);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
