@@ -1,4 +1,4 @@
-import { Soundcloud } from "soundcloud.ts";
+import { Soundcloud, SoundcloudTrack } from "soundcloud.ts";
 import {
   SoundCloudPlaylistInfo,
   SoundCloudTrackInfo,
@@ -30,7 +30,7 @@ async function retry<T>(
   }
 }
 
-async function fetchAllTracks(initialTracks: SoundCloudTrackInfo[]) {
+async function fetchAllTracks(initialTracks: SoundcloudTrack[]) {
   let allTracks = [...initialTracks];
   let nextHref = (initialTracks as any).next_href;
 
@@ -49,14 +49,14 @@ export async function resolvePlaylist(url: string) {
   );
   const tracks = await fetchAllTracks(playlist.tracks);
   return {
-    playlistInfo: playlist as SoundCloudPlaylistInfo,
-    tracks: tracks as SoundCloudTrackInfo[],
+    playlistInfo: playlist,
+    tracks: tracks,
   };
 }
 
 export async function resolveTrack(url: string) {
   const track = await retry(() => soundcloud.tracks.get(cleanUrl(url)));
-  return track as SoundCloudTrackInfo;
+  return track;
 }
 
 export async function getTrackDownloadUrl(track: SoundCloudTrackInfo) {
