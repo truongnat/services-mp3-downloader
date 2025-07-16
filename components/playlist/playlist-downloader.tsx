@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
 import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";
 import { DownloadLocationDialog } from "@/components/download-location-dialog";
-import { downloadTrack } from "@/lib/soundcloud";
+import { downloadTrack } from "@/lib/soundcloud/soundcloud";
 
 // Components
 import PlaylistInput from "./playlist-input";
@@ -56,7 +56,6 @@ export default function PlaylistDownloader({
   const performDownload = useCallback(async (
     track: CommonTrackInfo, 
     index: number, 
-    useCustomLocation: boolean
   ) => {
     const trackId = track.id;
     updateTrackStatus(trackId, { status: "downloading", progress: 0 });
@@ -67,7 +66,6 @@ export default function PlaylistDownloader({
         index,
         audioSettings,
         platform,
-        useCustomLocation,
         (progress: DownloadProgress) => {
           updateTrackStatus(trackId, { progress: progress.percent });
         },
@@ -120,7 +118,7 @@ export default function PlaylistDownloader({
         if (status.status === "done") continue;
 
         // For batch downloads, use default location (no confirmation dialog)
-        await performDownload(track, i, false);
+        await performDownload(track, i);
       }
     } finally {
       endDownloadSession();
