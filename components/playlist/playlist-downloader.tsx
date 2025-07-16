@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
 import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";
 import { DownloadLocationDialog } from "@/components/download-location-dialog";
-import { downloadTrack } from "@/lib/download-track";
+import { downloadTrack } from "@/lib/soundcloud";
 
 // Components
 import PlaylistInput from "./playlist-input";
