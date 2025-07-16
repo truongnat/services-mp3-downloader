@@ -8,7 +8,6 @@ export async function downloadYouTubeTrack(
   index: number,
   settings: AudioSettings,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-  onMacOSDownload?: () => void
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
 
@@ -30,14 +29,13 @@ export async function downloadSoundCloudTrack(
   index: number,
   settings: AudioSettings,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-  onMacOSDownload?: () => void
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
 
   try {
     // Direct download from SoundCloud stream URL
     const blob = await downloadWithProgress(track.streamUrl, onProgress);
-    await saveFile(blob, filename, onMacOSDownload);
+    await saveFile(blob, filename);
   } catch (error) {
     console.error('SoundCloud download error:', error);
     throw error;
@@ -69,7 +67,6 @@ export async function downloadYouTubeTrackWithConfirmation(
   settings: AudioSettings,
   useCustomLocation: boolean,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-  onMacOSDownload?: () => void
 ): Promise<void> {
   const filename = generateFilename(track, index, settings);
 
@@ -78,7 +75,7 @@ export async function downloadYouTubeTrackWithConfirmation(
 
   try {
     const blob = await downloadWithProgress(proxyUrl, onProgress);
-    await saveFileWithConfirmation(blob, filename, useCustomLocation, onMacOSDownload);
+    await saveFileWithConfirmation(blob, filename, useCustomLocation);
   } catch (error) {
     console.error('YouTube download error:', error);
     throw error;
@@ -113,13 +110,12 @@ export async function downloadTrackWithConfirmation(
   platform: 'youtube' | 'soundcloud',
   useCustomLocation: boolean,
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-  onMacOSDownload?: () => void
 ): Promise<void> {
   switch (platform) {
     case 'youtube':
-      return downloadYouTubeTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress, onMacOSDownload);
+      return downloadYouTubeTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress);
     case 'soundcloud':
-      return downloadSoundCloudTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress, onMacOSDownload);
+      return downloadSoundCloudTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
