@@ -1,8 +1,9 @@
 "use client"
 import { useCallback } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
-import { downloadTrack } from "@/lib/platform-downloads";
-import { CommonTrackInfo, DownloadProgress } from "@/lib/download-utils";
+import { downloadTrackWithConfirmation } from "@/lib/platform-downloads";
+import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";
+import { DownloadLocationDialog } from "@/components/download-location-dialog";
 
 // Components
 import PlaylistInput from "./playlist-input";

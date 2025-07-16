@@ -1,4 +1,4 @@
-import { CommonTrackInfo, downloadWithProgress, saveFile, generateFilename } from "@/lib/download-utils";
+import { CommonTrackInfo, downloadWithProgress, saveFile, saveFileWithConfirmation, generateFilename } from "@/lib/download-utils";
 export type { DownloadProgress } from "@/lib/download-utils";
 import { AudioSettings } from "@/lib/settings";
 
@@ -58,6 +58,70 @@ export async function downloadTrack(
       return downloadYouTubeTrack(track, index, settings, onProgress, onMacOSDownload);
     case 'soundcloud':
       return downloadSoundCloudTrack(track, index, settings, onProgress, onMacOSDownload);
+    default:
+      throw new Error(`Unsupported platform: ${platform}`);
+  }
+}
+
+// YouTube-specific download function with location confirmation
+export async function downloadYouTubeTrackWithConfirmation(
+  track: CommonTrackInfo,
+  index: number,
+  settings: AudioSettings,
+  useCustomLocation: boolean,
+  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
+): Promise<void> {
+  const filename = generateFilename(track, index, settings);
+
+  // Use YouTube API proxy for download
+  const proxyUrl = `/api/youtube/download?url=${encodeURIComponent(track.streamUrl)}&filename=${encodeURIComponent(filename)}`;
+
+  try {
+    const blob = await downloadWithProgress(proxyUrl, onProgress);
+    await saveFileWithConfirmation(blob, filename, useCustomLocation, onMacOSDownload);
+  } catch (error) {
+    console.error('YouTube download error:', error);
+    throw error;
+  }
+}
+
+// SoundCloud-specific download function with location confirmation
+export async function downloadSoundCloudTrackWithConfirmation(
+  track: CommonTrackInfo,
+  index: number,
+  settings: AudioSettings,
+  useCustomLocation: boolean,
+  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
+): Promise<void> {
+  const filename = generateFilename(track, index, settings);
+
+  try {
+    // Direct download from SoundCloud stream URL
+    const blob = await downloadWithProgress(track.streamUrl, onProgress);
+    await saveFileWithConfirmation(blob, filename, useCustomLocation, onMacOSDownload);
+  } catch (error) {
+    console.error('SoundCloud download error:', error);
+    throw error;
+  }
+}
+
+// Generic download function with location confirmation
+export async function downloadTrackWithConfirmation(
+  track: CommonTrackInfo,
+  index: number,
+  settings: AudioSettings,
+  platform: 'youtube' | 'soundcloud',
+  useCustomLocation: boolean,
+  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
+): Promise<void> {
+  switch (platform) {
+    case 'youtube':
+      return downloadYouTubeTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress, onMacOSDownload);
+    case 'soundcloud':
+      return downloadSoundCloudTrackWithConfirmation(track, index, settings, useCustomLocation, onProgress, onMacOSDownload);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }

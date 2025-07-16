@@ -151,6 +151,50 @@ export async function saveFile(
   }
 }
 
+// Save file with location confirmation
+export async function saveFileWithConfirmation(
+  blob: Blob,
+  filename: string,
+  useCustomLocation: boolean,
+  onMacOSDownload?: () => void
+): Promise<void> {
+  if (useCustomLocation && supportsFileSystemAccess()) {
+    // Use File System Access API to let user choose location
+    try {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'Audio files',
+          accept: { 'audio/*': ['.mp3', '.m4a', '.wav'] }
+        }]
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (error) {
+      // User cancelled or error, fall back to regular download
+      console.log('File System Access API failed, falling back to regular download');
+    }
+  }
+
+  // Use default download location
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  // Detect macOS and show tip
+  const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  if (isMac && onMacOSDownload) {
+    onMacOSDownload();
+  }
+}
+
 
 
 // Common error messages
