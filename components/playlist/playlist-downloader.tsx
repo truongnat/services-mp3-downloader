@@ -1,9 +1,9 @@
 "use client"
 import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
+import { downloadTrackWithProgress } from "@/lib/soundcloud/soundcloud";
 import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";
 import { DownloadLocationDialog } from "@/components/download-location-dialog";
-import { downloadTrack } from "@/lib/soundcloud/soundcloud";
 
 // Components
 import PlaylistInput from "./playlist-input";
@@ -35,6 +35,7 @@ export default function PlaylistDownloader({
     updateTrackStatus,
     startDownloadSession,
     endDownloadSession,
+    showMacOSTip,
     hideMacOSTip,
     getTrackStatus
   } = usePlaylistDownloader<CommonTrackInfo>();
@@ -61,11 +62,8 @@ export default function PlaylistDownloader({
     updateTrackStatus(trackId, { status: "downloading", progress: 0 });
 
     try {
-      await downloadTrack(
+      await downloadTrackWithProgress(
         track,
-        index,
-        audioSettings,
-        platform,
         (progress: DownloadProgress) => {
           updateTrackStatus(trackId, { progress: progress.percent });
         },
@@ -76,7 +74,7 @@ export default function PlaylistDownloader({
       const message = error instanceof Error ? error.message : 'Download failed';
       updateTrackStatus(trackId, { status: "error", progress: 0, error: message });
     }
-  }, [audioSettings, platform, updateTrackStatus]);
+  }, [audioSettings, platform, updateTrackStatus, showMacOSTip]);
 
   // Handle single track download - show confirmation dialog
   const handleDownloadTrack = useCallback(async (track: CommonTrackInfo, index: number) => {
@@ -92,7 +90,7 @@ export default function PlaylistDownloader({
   // Handle download confirmation
   const handleDownloadConfirm = useCallback((useCustomLocation: boolean) => {
     if (downloadDialog.track) {
-      performDownload(downloadDialog.track, downloadDialog.index);
+      performDownload(downloadDialog.track, downloadDialog.index, useCustomLocation);
     }
   }, [downloadDialog, performDownload]);
 
@@ -118,7 +116,7 @@ export default function PlaylistDownloader({
         if (status.status === "done") continue;
 
         // For batch downloads, use default location (no confirmation dialog)
-        await performDownload(track, i);
+        await performDownload(track, i, false);
       }
     } finally {
       endDownloadSession();
