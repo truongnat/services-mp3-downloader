@@ -75,7 +75,7 @@ export async function downloadYouTubeTrackWithConfirmation(
 
   try {
     const blob = await downloadWithProgress(proxyUrl, onProgress);
-    await saveFileWithConfirmation(blob, filename, useCustomLocation);
+    await saveFile(blob, filename);
   } catch (error) {
     console.error('YouTube download error:', error);
     throw error;
