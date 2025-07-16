@@ -1,5 +1,5 @@
 "use client"
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
 import { downloadTrackWithConfirmation } from "@/lib/platform-downloads";
 import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";

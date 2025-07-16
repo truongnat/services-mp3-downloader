@@ -45,7 +45,7 @@ async function fetchAllTracks(initialTracks: SoundCloudTrackInfo[]) {
 
 export async function resolvePlaylist(url: string) {
   const playlist = await retry(() =>
-    soundcloud.playlists.resolve(cleanUrl(url))
+    soundcloud.playlists.get(cleanUrl(url))
   );
   const tracks = await fetchAllTracks(playlist.tracks);
   return {
@@ -55,7 +55,7 @@ export async function resolvePlaylist(url: string) {
 }
 
 export async function resolveTrack(url: string) {
-  const track = await retry(() => soundcloud.tracks.resolve(cleanUrl(url)));
+  const track = await retry(() => soundcloud.tracks.get(cleanUrl(url)));
   return track as SoundCloudTrackInfo;
 }
 
