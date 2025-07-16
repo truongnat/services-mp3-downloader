@@ -60,65 +60,6 @@ export async function downloadTrack(
   }
 }
 
-// YouTube-specific download function with location confirmation
-export async function downloadYouTubeTrackWithConfirmation(
-  track: CommonTrackInfo,
-  index: number,
-  settings: AudioSettings,
-  useCustomLocation: boolean,
-  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-): Promise<void> {
-  const filename = generateFilename(track, index, settings);
-
-  // Use YouTube API proxy for download
-  const proxyUrl = `/api/youtube/download?url=${encodeURIComponent(track.streamUrl)}&filename=${encodeURIComponent(filename)}`;
-
-  try {
-    const blob = await downloadWithProgress(proxyUrl, onProgress);
-    await saveFile(blob, filename);
-  } catch (error) {
-    console.error('YouTube download error:', error);
-    throw error;
-  }
-}
-
-// SoundCloud-specific download function with location confirmation
-export async function downloadSoundCloudTrackWithConfirmation(
-  track: CommonTrackInfo,
-  index: number,
-  settings: AudioSettings,
-  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-): Promise<void> {
-  const filename = generateFilename(track, index, settings);
-
-  try {
-    // Direct download from SoundCloud stream URL
-    const blob = await downloadWithProgress(track.streamUrl, onProgress);
-    await saveFile(blob, filename);
-  } catch (error) {
-    console.error('SoundCloud download error:', error);
-    throw error;
-  }
-}
-
-// Generic download function with location confirmation
-export async function downloadTrackWithConfirmation(
-  track: CommonTrackInfo,
-  index: number,
-  settings: AudioSettings,
-  platform: 'youtube' | 'soundcloud',
-  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-): Promise<void> {
-  switch (platform) {
-   case 'youtube':
-      return downloadYouTubeTrack(track, index, settings, onProgress);
-    case 'soundcloud':
-      return downloadSoundCloudTrack(track, index, settings, onProgress);
-    default:
-      throw new Error(`Unsupported platform: ${platform}`);
-  }
-}
-
 // Batch download function with concurrency control
 export async function downloadTracks(
   tracks: CommonTrackInfo[],
