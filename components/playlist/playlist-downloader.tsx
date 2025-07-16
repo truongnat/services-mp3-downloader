@@ -92,7 +92,7 @@ export default function PlaylistDownloader({
   // Handle download confirmation
   const handleDownloadConfirm = useCallback((useCustomLocation: boolean) => {
     if (downloadDialog.track) {
-      performDownload(downloadDialog.track, downloadDialog.index, useCustomLocation);
+      performDownload(downloadDialog.track, downloadDialog.index);
     }
   }, [downloadDialog, performDownload]);
 
