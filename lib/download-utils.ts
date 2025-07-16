@@ -14,11 +14,6 @@ export interface CommonTrackInfo {
   bitrate?: number;
 }
 
-// Check if File System Access API is supported
-export function supportsFileSystemAccess(): boolean {
-  return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
-}
-
 // Generate filename based on settings
 export function generateFilename(track: CommonTrackInfo, index: number, settings: AudioSettings): string {
   let filename = settings.filenameFormat;
@@ -107,34 +102,13 @@ export async function downloadWithProgress(
   return new Blob(chunks);
 }
 
-// Save file using File System Access API or fallback to download
+// Save file directly to browser's default download location
 export async function saveFile(
   blob: Blob,
   filename: string,
   onMacOSDownload?: () => void
 ): Promise<void> {
-  // Try File System Access API first (Chrome/Edge)
-  if (supportsFileSystemAccess()) {
-    try {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{
-          description: 'Audio files',
-          accept: { 'audio/*': ['.mp3', '.m4a', '.wav'] }
-        }]
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return; // Success, no need for fallback
-
-    } catch {
-      // User cancelled or error, fall back to regular download
-      console.log('File System Access API failed, falling back to regular download');
-    }
-  }
-
-  // Fallback: Regular download
+  // Direct download to default location
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
