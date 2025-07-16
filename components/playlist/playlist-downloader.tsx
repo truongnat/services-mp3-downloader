@@ -1,7 +1,6 @@
 "use client"
 import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
-import { downloadTrackWithConfirmation } from "@/lib/platform-downloads";
 import { CommonTrackInfo, DownloadProgress, generateFilename } from "@/lib/download-utils";
 import { DownloadLocationDialog } from "@/components/download-location-dialog";
 
@@ -35,7 +34,6 @@ export default function PlaylistDownloader({
     updateTrackStatus,
     startDownloadSession,
     endDownloadSession,
-    showMacOSTip,
     hideMacOSTip,
     getTrackStatus
   } = usePlaylistDownloader<CommonTrackInfo>();
@@ -63,7 +61,7 @@ export default function PlaylistDownloader({
     updateTrackStatus(trackId, { status: "downloading", progress: 0 });
 
     try {
-      await downloadTrackWithConfirmation(
+      await downloadTrack(
         track,
         index,
         audioSettings,
@@ -72,7 +70,6 @@ export default function PlaylistDownloader({
         (progress: DownloadProgress) => {
           updateTrackStatus(trackId, { progress: progress.percent });
         },
-        showMacOSTip
       );
 
       updateTrackStatus(trackId, { status: "done", progress: 100 });
@@ -80,7 +77,7 @@ export default function PlaylistDownloader({
       const message = error instanceof Error ? error.message : 'Download failed';
       updateTrackStatus(trackId, { status: "error", progress: 0, error: message });
     }
-  }, [audioSettings, platform, updateTrackStatus, showMacOSTip]);
+  }, [audioSettings, platform, updateTrackStatus]);
 
   // Handle single track download - show confirmation dialog
   const handleDownloadTrack = useCallback(async (track: CommonTrackInfo, index: number) => {
