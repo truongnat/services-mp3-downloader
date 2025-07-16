@@ -113,27 +113,6 @@ export async function saveFile(
   filename: string,
   onMacOSDownload?: () => void
 ): Promise<void> {
-  // Try File System Access API first (Chrome/Edge)
-  if (supportsFileSystemAccess()) {
-    try {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{
-          description: 'Audio files',
-          accept: { 'audio/*': ['.mp3', '.m4a', '.wav'] }
-        }]
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return; // Success, no need for fallback
-
-    } catch {
-      // User cancelled or error, fall back to regular download
-      console.log('File System Access API failed, falling back to regular download');
-    }
-  }
-
   // Fallback: Regular download
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
