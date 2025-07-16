@@ -40,17 +40,35 @@ export default function PlaylistDownloader({
     getTrackStatus
   } = usePlaylistDownloader<CommonTrackInfo>();
 
-  // Handle single track download
-  const handleDownloadTrack = useCallback(async (track: CommonTrackInfo, index: number) => {
+  // Download confirmation dialog state
+  const [downloadDialog, setDownloadDialog] = useState<{
+    open: boolean;
+    track: CommonTrackInfo | null;
+    index: number;
+    filename: string;
+  }>({
+    open: false,
+    track: null,
+    index: 0,
+    filename: ""
+  });
+
+  // Handle actual download after confirmation
+  const performDownload = useCallback(async (
+    track: CommonTrackInfo, 
+    index: number, 
+    useCustomLocation: boolean
+  ) => {
     const trackId = track.id;
     updateTrackStatus(trackId, { status: "downloading", progress: 0 });
 
     try {
-      await downloadTrack(
+      await downloadTrackWithConfirmation(
         track,
         index,
         audioSettings,
         platform,
+        useCustomLocation,
         (progress: DownloadProgress) => {
           updateTrackStatus(trackId, { progress: progress.percent });
         },
@@ -63,6 +81,29 @@ export default function PlaylistDownloader({
       updateTrackStatus(trackId, { status: "error", progress: 0, error: message });
     }
   }, [audioSettings, platform, updateTrackStatus, showMacOSTip]);
+
+  // Handle single track download - show confirmation dialog
+  const handleDownloadTrack = useCallback(async (track: CommonTrackInfo, index: number) => {
+    const filename = generateFilename(track, index, audioSettings);
+    setDownloadDialog({
+      open: true,
+      track,
+      index,
+      filename
+    });
+  }, [audioSettings]);
+
+  // Handle download confirmation
+  const handleDownloadConfirm = useCallback((useCustomLocation: boolean) => {
+    if (downloadDialog.track) {
+      performDownload(downloadDialog.track, downloadDialog.index, useCustomLocation);
+    }
+  }, [downloadDialog, performDownload]);
+
+  // Handle download cancellation
+  const handleDownloadCancel = useCallback(() => {
+    // Just close the dialog, no download happens
+  }, []);
 
   // Handle download all tracks
   const handleDownloadAll = useCallback(async () => {
@@ -80,13 +121,14 @@ export default function PlaylistDownloader({
         // Skip already downloaded tracks
         if (status.status === "done") continue;
 
-        await handleDownloadTrack(track, i);
+        // For batch downloads, use default location (no confirmation dialog)
+        await performDownload(track, i, false);
       }
     } finally {
       endDownloadSession();
       setDisableTabs?.(false);
     }
-  }, [playlist.tracks, startDownloadSession, endDownloadSession, handleDownloadTrack, getTrackStatus, setDisableTabs]);
+  }, [playlist.tracks, startDownloadSession, endDownloadSession, performDownload, getTrackStatus, setDisableTabs]);
 
   // Handle load playlist
   const handleLoadPlaylist = useCallback(() => {
@@ -96,8 +138,6 @@ export default function PlaylistDownloader({
   return (
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold mb-6">{title}</h1>
-
-
 
       {/* URL Input */}
       <PlaylistInput
@@ -148,6 +188,15 @@ export default function PlaylistDownloader({
           </p>
         </div>
       )}
+
+      {/* Download Location Confirmation Dialog */}
+      <DownloadLocationDialog
+        open={downloadDialog.open}
+        onOpenChange={(open) => setDownloadDialog(prev => ({ ...prev, open }))}
+        filename={downloadDialog.filename}
+        onConfirm={handleDownloadConfirm}
+        onCancel={handleDownloadCancel}
+      />
     </div>
   );
 }
