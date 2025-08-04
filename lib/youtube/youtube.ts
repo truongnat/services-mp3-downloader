@@ -569,6 +569,15 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
             throw new Error("Invalid YouTube playlist URL - could not extract playlist ID");
         }
 
+        // Check if this is a supported playlist type
+        if (!isSupportedPlaylistType(playlistId)) {
+            if (playlistId.startsWith('RD')) {
+                throw new Error("YouTube Music radio/mix playlists are not supported. Please use a regular YouTube playlist instead.");
+            } else {
+                throw new Error(`Unsupported playlist type: ${playlistId.substring(0, 2)}. Only standard YouTube playlists are supported.`);
+            }
+        }
+
         // Use Innertube to get playlist info
         let yt: Innertube;
         try {
@@ -586,7 +595,17 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
             playlistInfo = await yt.getPlaylist(playlistId);
         } catch (e: any) {
             console.error('[YouTube] Error getting playlist info:', e);
-            throw new Error("Failed to fetch playlist information");
+
+            // Provide more specific error messages based on the error
+            if (e.message?.includes('not found') || e.message?.includes('404')) {
+                throw new Error("Playlist not found. Please check the URL and make sure the playlist is public.");
+            } else if (e.message?.includes('private') || e.message?.includes('403')) {
+                throw new Error("This playlist is private and cannot be accessed.");
+            } else if (e.message?.includes('unavailable')) {
+                throw new Error("This playlist is currently unavailable.");
+            } else {
+                throw new Error("Failed to fetch playlist information. Please try again later.");
+            }
         }
 
         if (!playlistInfo) {
