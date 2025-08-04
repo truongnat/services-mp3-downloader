@@ -39,9 +39,6 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
       throw new Error("Invalid TikTok URL - could not extract video ID");
     }
 
-    console.log('[TikTok] Attempting to fetch video data for URL:', clean);
-    console.log('[TikTok] Extracted video ID:', videoId);
-
     // Try v2 first, fallback to v1 if it fails
     let result;
     try {
@@ -59,8 +56,6 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
         throw new Error(`TikTok API unavailable: ${v2Error.message || v2Error}`);
       }
     }
-
-    console.log('[TikTok] API response:', JSON.stringify(result, null, 2));
 
     if (!result) {
       throw new Error("TikTok API returned null/undefined response");
