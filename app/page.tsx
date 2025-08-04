@@ -8,8 +8,8 @@ import { SoundCloudIcon, YouTubeIcon, SettingsIcon } from "@/components/icons";
 import { SettingsDialog } from "@/components/settings-dialog";
 import PlaylistDownloaderSoundCloud from "./PlaylistDownloaderSoundCloud";
 import PlaylistDownloaderYouTube from "./PlaylistDownloaderYouTube";
-import PlaylistDownloaderTiktok from "./PlaylistDownloaderTiktok";
-import { TikTokIcon } from "@/components/icons";
+// import PlaylistDownloaderTiktok from "./PlaylistDownloaderTiktok";
+// import { TikTokIcon } from "@/components/icons";
 
 export default function Home() {
   const [disableTabs, setDisableTabs] = useState(false);
