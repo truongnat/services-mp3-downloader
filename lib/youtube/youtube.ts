@@ -581,12 +581,15 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
         // Use Innertube to get playlist info
         let yt: Innertube;
         try {
+            console.log('[YouTube] Initializing client for playlist:', playlistId);
             yt = await cloneInnertube(
                 undefined, // Let Innertube use its default fetch
                 false // Don't use session for playlist
             );
+            console.log('[YouTube] Client initialized successfully');
         } catch (e) {
-            throw new Error("Failed to initialize YouTube client");
+            console.error('[YouTube] Failed to initialize client:', e);
+            throw new Error(`Failed to initialize YouTube client: ${e instanceof Error ? e.message : 'Unknown error'}`);
         }
 
         // Get playlist info
@@ -595,6 +598,12 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
             playlistInfo = await yt.getPlaylist(playlistId);
         } catch (e: any) {
             console.error('[YouTube] Error getting playlist info:', e);
+            console.error('[YouTube] Error details:', {
+                message: e.message,
+                stack: e.stack,
+                name: e.name,
+                playlistId: playlistId
+            });
 
             // Provide more specific error messages based on the error
             if (e.message?.includes('not found') || e.message?.includes('404')) {
@@ -603,8 +612,13 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
                 throw new Error("This playlist is private and cannot be accessed.");
             } else if (e.message?.includes('unavailable')) {
                 throw new Error("This playlist is currently unavailable.");
+            } else if (e.message?.includes('Sign in to confirm your age')) {
+                throw new Error("This playlist requires age verification and cannot be accessed.");
+            } else if (e.message?.includes('Video unavailable')) {
+                throw new Error("Some videos in this playlist are unavailable.");
             } else {
-                throw new Error("Failed to fetch playlist information. Please try again later.");
+                // Include more details in the error for debugging
+                throw new Error(`Failed to fetch playlist information: ${e.message || 'Unknown error'}. Please try again later.`);
             }
         }
 
