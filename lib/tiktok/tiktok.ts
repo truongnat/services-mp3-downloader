@@ -76,22 +76,26 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
     if (result.status === "error") {
       // Handle specific error cases
       if (result.message?.includes("ECONNREFUSED")) {
-        throw new Error("TikTok service is currently unavailable. Please try again later.");
-      } else if (result.message?.includes("Video not found")) {
-        throw new Error("TikTok video not found. Please check the URL and try again.");
-      } else if (result.message?.includes("Private video")) {
+        throw new Error("TikTok service is currently unavailable due to network connectivity issues. This may be caused by firewall restrictions, regional blocking, or service maintenance. Please try again later or check your network configuration.");
+      } else if (result.message?.includes("Video not found") || result.message?.includes("404")) {
+        throw new Error("TikTok video not found. The video may have been deleted, made private, or the URL is incorrect.");
+      } else if (result.message?.includes("Private video") || result.message?.includes("403")) {
         throw new Error("This TikTok video is private and cannot be accessed.");
+      } else if (result.message?.includes("timeout")) {
+        throw new Error("TikTok API request timed out. The service may be experiencing high load. Please try again later.");
+      } else if (result.message?.includes("rate limit") || result.message?.includes("429")) {
+        throw new Error("TikTok API rate limit exceeded. Please wait a few minutes before trying again.");
       } else {
-        throw new Error(`TikTok API error: ${result.message || 'Unknown error'}`);
+        throw new Error(`TikTok API error: ${result.message || 'Unknown error'}. Please try again later.`);
       }
     }
 
-    if (!result.status) {
+    if (result.status !== "success") {
       throw new Error(`TikTok API request failed: ${result.message || 'Unknown error'}`);
     }
 
     if (!result.result) {
-      throw new Error("TikTok API returned no video data");
+      throw new Error("TikTok API returned no video data. The video may be unavailable or restricted.");
     }
 
     const videoData = result.result;
