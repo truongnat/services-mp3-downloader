@@ -562,8 +562,11 @@ export async function resolveVideo(url: string): Promise<YouTubeTrackInfo> {
 // Resolve playlist from URL
 export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiResponse> {
     try {
+        console.log('[YouTube] Original URL:', url);
         const clean = cleanUrl(url);
+        console.log('[YouTube] Cleaned URL:', clean);
         const playlistId = extractPlaylistId(clean);
+        console.log('[YouTube] Extracted playlist ID:', playlistId);
 
         if (!playlistId) {
             throw new Error("Invalid YouTube playlist URL - could not extract playlist ID");
