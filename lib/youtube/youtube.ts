@@ -55,6 +55,33 @@ function extractPlaylistId(url: string): string | null {
     return null;
 }
 
+// Check if playlist ID is a supported type
+function isSupportedPlaylistType(playlistId: string): boolean {
+    // Standard playlists: PL (public playlists), UU (user uploads), FL (favorites/liked videos)
+    // WL (Watch Later), LL (Liked videos - legacy)
+    const supportedPrefixes = ['PL', 'UU', 'FL', 'WL', 'LL'];
+
+    // Radio/Mix playlists (RD*) are dynamically generated and not supported
+    // RDMM = YouTube Music Mix, RDGMEM = YouTube Music radio, etc.
+    const unsupportedPrefixes = ['RD'];
+
+    for (const prefix of unsupportedPrefixes) {
+        if (playlistId.startsWith(prefix)) {
+            return false;
+        }
+    }
+
+    for (const prefix of supportedPrefixes) {
+        if (playlistId.startsWith(prefix)) {
+            return true;
+        }
+    }
+
+    // If it doesn't match known patterns, assume it might be supported
+    // (to handle future playlist types)
+    return true;
+}
+
 // Clean up the URL by removing tracking parameters
 function cleanUrl(url: string): string {
     try {
