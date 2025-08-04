@@ -42,14 +42,41 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
     console.log('[TikTok] Attempting to fetch video data for URL:', clean);
     console.log('[TikTok] Extracted video ID:', videoId);
 
-    const result = await Tiktok.Downloader(clean, {
-      version: "v2", // Use v2 for better results
-    });
+    // Try v2 first, fallback to v1 if it fails
+    let result;
+    try {
+      result = await Tiktok.Downloader(clean, {
+        version: "v2", // Use v2 for better results
+      });
+    } catch (v2Error) {
+      console.log('[TikTok] v2 API failed, trying v1:', v2Error);
+      try {
+        result = await Tiktok.Downloader(clean, {
+          version: "v1", // Fallback to v1
+        });
+      } catch (v1Error) {
+        console.log('[TikTok] Both v1 and v2 APIs failed');
+        throw new Error(`TikTok API unavailable: ${v2Error.message || v2Error}`);
+      }
+    }
 
     console.log('[TikTok] API response:', JSON.stringify(result, null, 2));
 
     if (!result) {
       throw new Error("TikTok API returned null/undefined response");
+    }
+
+    if (result.status === "error") {
+      // Handle specific error cases
+      if (result.message?.includes("ECONNREFUSED")) {
+        throw new Error("TikTok service is currently unavailable. Please try again later.");
+      } else if (result.message?.includes("Video not found")) {
+        throw new Error("TikTok video not found. Please check the URL and try again.");
+      } else if (result.message?.includes("Private video")) {
+        throw new Error("This TikTok video is private and cannot be accessed.");
+      } else {
+        throw new Error(`TikTok API error: ${result.message || 'Unknown error'}`);
+      }
     }
 
     if (!result.status) {
