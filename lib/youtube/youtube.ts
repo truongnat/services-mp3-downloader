@@ -562,11 +562,8 @@ export async function resolveVideo(url: string): Promise<YouTubeTrackInfo> {
 // Resolve playlist from URL
 export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiResponse> {
     try {
-        console.log('[YouTube] Original URL:', url);
         const clean = cleanUrl(url);
-        console.log('[YouTube] Cleaned URL:', clean);
         const playlistId = extractPlaylistId(clean);
-        console.log('[YouTube] Extracted playlist ID:', playlistId);
 
         if (!playlistId) {
             throw new Error("Invalid YouTube playlist URL - could not extract playlist ID");
@@ -584,12 +581,10 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
         // Use Innertube to get playlist info
         let yt: Innertube;
         try {
-            console.log('[YouTube] Initializing client for playlist:', playlistId);
             yt = await cloneInnertube(
                 undefined, // Let Innertube use its default fetch
                 false // Don't use session for playlist
             );
-            console.log('[YouTube] Client initialized successfully');
         } catch (e) {
             console.error('[YouTube] Failed to initialize client:', e);
             throw new Error(`Failed to initialize YouTube client: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -601,12 +596,6 @@ export async function resolvePlaylist(url: string): Promise<YouTubePlaylistApiRe
             playlistInfo = await yt.getPlaylist(playlistId);
         } catch (e: any) {
             console.error('[YouTube] Error getting playlist info:', e);
-            console.error('[YouTube] Error details:', {
-                message: e.message,
-                stack: e.stack,
-                name: e.name,
-                playlistId: playlistId
-            });
 
             // Provide more specific error messages based on the error
             if (e.message?.includes('not found') || e.message?.includes('404')) {
