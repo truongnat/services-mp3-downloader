@@ -31,7 +31,7 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="soundcloud" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-12 sm:h-10">
+          <TabsList className="grid w-full grid-cols-2 h-12 sm:h-10">
             <TabsTrigger
               value="soundcloud"
               className="flex items-center gap-2 text-sm sm:text-base h-10 sm:h-8"
@@ -50,7 +50,8 @@ export default function Home() {
               <span className="hidden xs:inline sm:inline">YouTube</span>
               <span className="xs:hidden sm:hidden">YT</span>
             </TabsTrigger>
-            <TabsTrigger
+            {/* TikTok tab hidden due to API connectivity issues */}
+            {/* <TabsTrigger
               value="tiktok"
               className="flex items-center gap-2 text-sm sm:text-base h-10 sm:h-8"
               disabled={disableTabs}
@@ -58,7 +59,7 @@ export default function Home() {
               <TikTokIcon width={18} height={18} className="sm:w-5 sm:h-5" />
               <span className="hidden xs:inline sm:inline">TikTok</span>
               <span className="xs:hidden sm:hidden">TT</span>
-            </TabsTrigger>
+            </TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="soundcloud" className="mt-4 sm:mt-6">
@@ -83,7 +84,8 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="tiktok" className="mt-4 sm:mt-6">
+          {/* TikTok tab content hidden due to API connectivity issues */}
+          {/* <TabsContent value="tiktok" className="mt-4 sm:mt-6">
             <Card className="pt-0">
               <CardContent className="py-0 px-4 sm:px-6">
                 <PlaylistDownloaderTiktok setDisableTabs={setDisableTabs} />
@@ -92,7 +94,7 @@ export default function Home() {
                 Supported format: TikTok video URLs
               </CardFooter>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
       </div>
     </main>
