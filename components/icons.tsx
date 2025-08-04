@@ -102,3 +102,19 @@ export const SettingsIcon: React.FC<IconProps> = ({
     <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m11-7a4 4 0 0 1 0 8 4 4 0 0 1 0-8z"/>
   </svg>
 );
+
+export const TikTokIcon: React.FC<IconProps> = ({
+  width = 24,
+  height = 24,
+  className = ""
+}) => (
+  <svg
+    width={width}
+    height={height}
+    className={className}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+  >
+    <path d="M12.525 2.001a11.001 11.001 0 0 0-1.001 21.998v-9.997h-3.004V12.5c.001-2.002 1.002-4.003 3.004-4.003h.999V5.002c0-1.001.999-2.001 1.999-2.001h.001zm-1.001 1.999c-.552 0-1 .448-1 1v2.5h-1.5c-1.379 0-2.5 1.121-2.5 2.5v2.5h2.5v6.5c0 .552.448 1 1 1s1-.448 1-1v-6.5h2.5v-2.5c0-1.379-1.121-2.5-2.5-2.5h-1.5V5.002c0-.552-.448-1-1-1z"/>
+  </svg>
+);

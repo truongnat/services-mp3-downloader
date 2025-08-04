@@ -12,7 +12,7 @@ interface PlaylistHeaderProps {
   isDownloading: boolean;
   downloadedCount: number;
   onDownloadAll: () => void;
-  platform: 'youtube' | 'soundcloud';
+  platform: 'youtube' | 'soundcloud' | 'tiktok';
 }
 
 export default function PlaylistHeader({
@@ -28,12 +28,14 @@ export default function PlaylistHeader({
 }: PlaylistHeaderProps) {
   const platformColors = {
     youtube: 'bg-red-500',
-    soundcloud: 'bg-orange-500'
+    soundcloud: 'bg-orange-500',
+    tiktok: 'bg-black'
   };
 
   const platformNames = {
     youtube: 'YouTube',
-    soundcloud: 'SoundCloud'
+    soundcloud: 'SoundCloud',
+    tiktok: 'TikTok'
   };
 
   return (

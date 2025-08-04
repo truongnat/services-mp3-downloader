@@ -9,7 +9,7 @@ interface PlaylistInputProps {
   onSubmit: () => void;
   isLoading: boolean;
   error: string | null;
-  platform: 'youtube' | 'soundcloud';
+  platform: 'youtube' | 'soundcloud' | 'tiktok';
   placeholder?: string;
 }
 
@@ -32,12 +32,18 @@ export default function PlaylistInput({
       'https://soundcloud.com/artist/sets/playlist',
       'https://soundcloud.com/artist/track',
       'https://on.soundcloud.com/SHORT_ID'
+    ],
+    tiktok: [
+      'https://www.tiktok.com/@username/video/VIDEO_ID',
+      'https://vm.tiktok.com/SHORT_ID'
     ]
   };
 
   const defaultPlaceholder = platform === 'youtube' 
     ? 'Enter YouTube playlist or video URL...'
-    : 'Enter SoundCloud playlist or track URL...';
+    : platform === 'soundcloud'
+    ? 'Enter SoundCloud playlist or track URL...'
+    : 'Enter TikTok video URL...';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -44,12 +44,34 @@ export async function downloadSoundCloudTrack(
   }
 }
 
+// TikTok-specific download function
+export async function downloadTikTokTrack(
+  track: CommonTrackInfo,
+  index: number,
+  settings: AudioSettings,
+  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
+  onMacOSDownload?: () => void
+): Promise<void> {
+  const filename = generateFilename(track, index, settings);
+
+  // Use TikTok API proxy for download
+  const proxyUrl = `/api/tiktok/download?url=${encodeURIComponent(track.streamUrl)}&filename=${encodeURIComponent(filename)}`;
+
+  try {
+    const blob = await downloadWithProgress(proxyUrl, onProgress);
+    await saveFile(blob, filename, onMacOSDownload);
+  } catch (error) {
+    console.error('TikTok download error:', error);
+    throw error;
+  }
+}
+
 // Generic download function that detects platform
 export async function downloadTrack(
   track: CommonTrackInfo,
   index: number,
   settings: AudioSettings,
-  platform: 'youtube' | 'soundcloud',
+  platform: 'youtube' | 'soundcloud' | 'tiktok',
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
   onMacOSDownload?: () => void
 ): Promise<void> {
@@ -58,6 +80,8 @@ export async function downloadTrack(
       return downloadYouTubeTrack(track, index, settings, onProgress, onMacOSDownload);
     case 'soundcloud':
       return downloadSoundCloudTrack(track, index, settings, onProgress, onMacOSDownload);
+    case 'tiktok':
+      return downloadTikTokTrack(track, index, settings, onProgress, onMacOSDownload);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -67,7 +91,7 @@ export async function downloadTrack(
 export async function downloadTracks(
   tracks: CommonTrackInfo[],
   settings: AudioSettings,
-  platform: 'youtube' | 'soundcloud',
+  platform: 'youtube' | 'soundcloud' | 'tiktok',
   onTrackProgress?: (trackIndex: number, progress: { percent: number; loaded: number; total: number }) => void,
   onTrackComplete?: (trackIndex: number) => void,
   onTrackError?: (trackIndex: number, error: Error) => void,

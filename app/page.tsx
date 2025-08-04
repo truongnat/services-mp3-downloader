@@ -8,6 +8,8 @@ import { SoundCloudIcon, YouTubeIcon, SettingsIcon } from "@/components/icons";
 import { SettingsDialog } from "@/components/settings-dialog";
 import PlaylistDownloaderSoundCloud from "./PlaylistDownloaderSoundCloud";
 import PlaylistDownloaderYouTube from "./PlaylistDownloaderYouTube";
+import PlaylistDownloaderTiktok from "./PlaylistDownloaderTiktok";
+import { TikTokIcon } from "@/components/icons";
 
 export default function Home() {
   const [disableTabs, setDisableTabs] = useState(false);
@@ -29,7 +31,7 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="soundcloud" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-12 sm:h-10">
+          <TabsList className="grid w-full grid-cols-3 h-12 sm:h-10">
             <TabsTrigger
               value="soundcloud"
               className="flex items-center gap-2 text-sm sm:text-base h-10 sm:h-8"
@@ -47,6 +49,15 @@ export default function Home() {
               <YouTubeIcon width={18} height={18} className="sm:w-5 sm:h-5" />
               <span className="hidden xs:inline sm:inline">YouTube</span>
               <span className="xs:hidden sm:hidden">YT</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="tiktok"
+              className="flex items-center gap-2 text-sm sm:text-base h-10 sm:h-8"
+              disabled={disableTabs}
+            >
+              <TikTokIcon width={18} height={18} className="sm:w-5 sm:h-5" />
+              <span className="hidden xs:inline sm:inline">TikTok</span>
+              <span className="xs:hidden sm:hidden">TT</span>
             </TabsTrigger>
           </TabsList>
 
@@ -68,6 +79,17 @@ export default function Home() {
               </CardContent>
               <CardFooter className="text-xs sm:text-sm text-muted-foreground px-4 sm:px-6">
                 Supported format: YouTube audio and playlist URLs
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tiktok" className="mt-4 sm:mt-6">
+            <Card className="pt-0">
+              <CardContent className="py-0 px-4 sm:px-6">
+                <PlaylistDownloaderTiktok setDisableTabs={setDisableTabs} />
+              </CardContent>
+              <CardFooter className="text-xs sm:text-sm text-muted-foreground px-4 sm:px-6">
+                Supported format: TikTok video URLs
               </CardFooter>
             </Card>
           </TabsContent>

@@ -217,5 +217,11 @@ export const SUPPORTED_URLS = {
       'https://snd.sc/playlist123',
       'https://on.soundcloud.com/G0AB3jVHxn3qWbRHJj'
     ]
+  },
+  tiktok: {
+    video: [
+      'https://www.tiktok.com/@username/video/1234567890123456789',
+      'https://vm.tiktok.com/ZM8c9g9g9/'
+    ]
   }
 };
