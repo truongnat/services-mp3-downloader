@@ -46,8 +46,6 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
 
     for (const version of versions) {
       try {
-        console.log(`[TikTok] Trying ${version} API...`);
-
         // Add timeout to prevent hanging
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error(`${version} API timeout`)), 15000);
@@ -56,10 +54,8 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
         const apiPromise = Tiktok.Downloader(clean, { version });
 
         result = await Promise.race([apiPromise, timeoutPromise]);
-        console.log(`[TikTok] ${version} API succeeded`);
         break;
       } catch (error) {
-        console.log(`[TikTok] ${version} API failed:`, error);
         lastError = error;
         continue;
       }
