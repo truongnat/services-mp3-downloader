@@ -39,22 +39,34 @@ export async function resolveTrack(url: string): Promise<TikTokTrackInfo> {
       throw new Error("Invalid TikTok URL - could not extract video ID");
     }
 
-    // Try v2 first, fallback to v1 if it fails
+    // Try different versions with timeout
     let result;
-    try {
-      result = await Tiktok.Downloader(clean, {
-        version: "v2", // Use v2 for better results
-      });
-    } catch (v2Error) {
-      console.log('[TikTok] v2 API failed, trying v1:', v2Error);
+    const versions = ["v3", "v2", "v1"] as const;
+    let lastError: any;
+
+    for (const version of versions) {
       try {
-        result = await Tiktok.Downloader(clean, {
-          version: "v1", // Fallback to v1
+        console.log(`[TikTok] Trying ${version} API...`);
+
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`${version} API timeout`)), 15000);
         });
-      } catch (v1Error) {
-        console.log('[TikTok] Both v1 and v2 APIs failed');
-        throw new Error(`TikTok API unavailable: ${v2Error.message || v2Error}`);
+
+        const apiPromise = Tiktok.Downloader(clean, { version });
+
+        result = await Promise.race([apiPromise, timeoutPromise]);
+        console.log(`[TikTok] ${version} API succeeded`);
+        break;
+      } catch (error) {
+        console.log(`[TikTok] ${version} API failed:`, error);
+        lastError = error;
+        continue;
       }
+    }
+
+    if (!result) {
+      throw new Error(`All TikTok API versions failed. Last error: ${lastError?.message || lastError}`);
     }
 
     if (!result) {
