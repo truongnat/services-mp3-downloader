@@ -2,10 +2,6 @@ import { CommonTrackInfo, downloadWithProgress, saveFile, generateFilename } fro
 export type { DownloadProgress } from "@/lib/download-utils";
 import { AudioSettings } from "@/lib/settings";
 
-    throw error;
-  }
-}
-
 // SoundCloud-specific download function
 export async function downloadSoundCloudTrack(
   track: CommonTrackInfo,
