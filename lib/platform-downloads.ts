@@ -2,24 +2,6 @@ import { CommonTrackInfo, downloadWithProgress, saveFile, generateFilename } fro
 export type { DownloadProgress } from "@/lib/download-utils";
 import { AudioSettings } from "@/lib/settings";
 
-// YouTube-specific download function
-export async function downloadYouTubeTrack(
-  track: CommonTrackInfo,
-  index: number,
-  settings: AudioSettings,
-  onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
-  onMacOSDownload?: () => void
-): Promise<void> {
-  const filename = generateFilename(track, index, settings);
-
-  // Use YouTube API proxy for download
-  const proxyUrl = `/api/youtube/download?url=${encodeURIComponent(track.streamUrl)}&filename=${encodeURIComponent(filename)}`;
-
-  try {
-    const blob = await downloadWithProgress(proxyUrl, onProgress);
-    await saveFile(blob, filename, onMacOSDownload);
-  } catch (error) {
-    console.error('YouTube download error:', error);
     throw error;
   }
 }
@@ -71,7 +53,7 @@ export async function downloadTrack(
   track: CommonTrackInfo,
   index: number,
   settings: AudioSettings,
-  platform: 'youtube' | 'soundcloud' | 'tiktok',
+  platform: 'youtube' | 'soundcloud',
   onProgress?: (progress: { percent: number; loaded: number; total: number }) => void,
   onMacOSDownload?: () => void
 ): Promise<void> {
@@ -80,8 +62,6 @@ export async function downloadTrack(
       return downloadYouTubeTrack(track, index, settings, onProgress, onMacOSDownload);
     case 'soundcloud':
       return downloadSoundCloudTrack(track, index, settings, onProgress, onMacOSDownload);
-    case 'tiktok':
-      return downloadTikTokTrack(track, index, settings, onProgress, onMacOSDownload);
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
