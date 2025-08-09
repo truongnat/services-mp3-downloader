@@ -2,7 +2,7 @@
 
 A modern, full-featured web application built with Next.js that allows users to download entire music playlists and individual tracks from multiple platforms with smart URL detection and advanced download management.
 
-> **⚠️ Note**: TikTok support is temporarily disabled due to API connectivity issues. Currently supporting SoundCloud and YouTube platforms.
+ > **⚠️ Note**: Hiện tại chỉ hỗ trợ SoundCloud và YouTube.
 
 ## ✨ Features
 
