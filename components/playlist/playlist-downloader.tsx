@@ -11,7 +11,7 @@ import TrackList from "./track-list";
 import MacOSTip from "./macos-tip";
 
 interface PlaylistDownloaderProps {
-  platform: 'youtube' | 'soundcloud' | 'tiktok';
+  platform: 'youtube' | 'soundcloud';
   apiEndpoint: string;
   title: string;
   setDisableTabs?: (v: boolean) => void;
