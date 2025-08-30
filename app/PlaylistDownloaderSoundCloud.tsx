@@ -162,24 +162,71 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
         </p>
       </div>
 
-      {/* URL Input */}
-      <PlaylistInput
-        url={url}
-        onUrlChange={setUrl}
-        onSubmit={handleLoadPlaylist}
-        isLoading={playlist.isLoading}
-        error={playlist.error}
-        platform="soundcloud"
-      />
+      {/* Search and URL Input */}
+      <div className="space-y-4 mb-6">
+        {/* Search Input */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-gray-500" />
+            <label className="text-sm font-medium">Search SoundCloud Tracks</label>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Search for tracks (e.g. 'lofi beats', 'jazz music')..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleSearch} 
+              disabled={isSearching || !searchQuery.trim()}
+              className="px-6"
+            >
+              {isSearching ? "Searching..." : "Search"}
+            </Button>
+            {(searchResults || searchError) && (
+              <Button variant="outline" onClick={clearSearch}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          {searchError && (
+            <p className="text-red-600 text-sm mt-2">{searchError}</p>
+          )}
+        </div>
+
+        {/* OR Divider */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <span className="text-sm text-gray-500 font-medium">OR</span>
+          <div className="flex-1 h-px bg-gray-300"></div>
+        </div>
+
+        {/* URL Input */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Paste SoundCloud URL</label>
+          <PlaylistInput
+            url={url}
+            onUrlChange={setUrl}
+            onSubmit={handleLoadPlaylist}
+            isLoading={playlist.isLoading}
+            error={playlist.error}
+            platform="soundcloud"
+            placeholder="Paste playlist or track URL here..."
+          />
+        </div>
+      </div>
 
       {/* Playlist Header */}
-      {playlist.info && (
+      {headerInfo && (
         <PlaylistHeader
-          title={playlist.info.title}
-          description={playlist.info.description}
-          coverUrl={playlist.info.artwork}
-          tracksCount={playlist.tracks.length}
-          totalDuration={playlist.info.totalDuration}
+          title={headerInfo.title}
+          description={headerInfo.description}
+          coverUrl={headerInfo.artwork}
+          tracksCount={currentTracks.length}
+          totalDuration={headerInfo.totalDuration}
           isDownloading={downloadState.isDownloading}
           downloadedCount={downloadState.overallProgress.completed}
           onDownloadAll={handleDownloadAll}
@@ -209,18 +256,18 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
               style={{ width: `${downloadState.overallProgress.percent}%` }}
             />
           </div>
-          {downloadState.currentTrackIndex >= 0 && playlist.tracks[downloadState.currentTrackIndex] && (
+          {downloadState.currentTrackIndex >= 0 && currentTracks[downloadState.currentTrackIndex] && (
             <p className="text-xs text-orange-600 mt-2">
-              Currently downloading: {playlist.tracks[downloadState.currentTrackIndex].title}
+              Currently downloading: {currentTracks[downloadState.currentTrackIndex].title}
             </p>
           )}
         </div>
       )}
 
       {/* Track List */}
-      {playlist.tracks.length > 0 && (
+      {currentTracks.length > 0 && (
         <TrackList
-          tracks={playlist.tracks}
+          tracks={currentTracks}
           getTrackStatus={getTrackStatus}
           onDownloadTrack={handleDownloadTrack}
           isDownloading={downloadState.isDownloading}
