@@ -303,6 +303,78 @@ export async function downloadAllTracks(tracks: SoundcloudTrack[]): Promise<(str
 }
 
 // Resolve single track info from URL
+// Search tracks on SoundCloud
+export async function searchTracks(
+  query: string,
+  limit = 20,
+  offset = 0
+): Promise<{ tracks: SoundCloudTrackInfo[]; hasMore: boolean }> {
+  try {
+    const searchResults = await retry(() => 
+      sc.tracks.search({
+        q: query,
+        limit,
+        offset
+      }) as Promise<SoundcloudTrack[]>,
+      2,
+      500
+    );
+
+    if (!Array.isArray(searchResults)) {
+      throw new Error("Search results is not an array");
+    }
+
+    // Filter out tracks that aren't streamable
+    const streamableTracks = searchResults.filter(track => 
+      track.streamable && 
+      track.media && 
+      Array.isArray(track.media.transcodings) &&
+      track.media.transcodings.length > 0
+    );
+
+    // Map tracks to our format
+    const tracks: SoundCloudTrackInfo[] = await Promise.all(
+      streamableTracks.map(async (track) => {
+        let streamUrl: string | null = null;
+        try {
+          if (track.media && Array.isArray(track.media.transcodings)) {
+            const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+            if (progressive) {
+              const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const data = await res.json();
+                streamUrl = data.url || null;
+              }
+            }
+          }
+        } catch { }
+        
+        return {
+          id: String(track.id),
+          title: track.title,
+          artist: track.user?.username || "",
+          duration: track.duration,
+          artwork: track.artwork_url || "",
+          url: track.permalink_url,
+          streamUrl,
+          size: undefined,
+          bitrate: undefined,
+          format: undefined,
+        };
+      })
+    );
+
+    return {
+      tracks,
+      hasMore: searchResults.length === limit // If we got the full limit, there might be more
+    };
+  } catch (err) {
+    console.error("Error searching SoundCloud tracks:", err);
+    throw err;
+  }
+}
+
 export async function resolveTrack(url: string) {
   try {
     const clean = await cleanUrl(url);
