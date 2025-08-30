@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "a1.sndcdn.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.sndcdn.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "i.ytimg.com",
         port: "",
         pathname: "/**",

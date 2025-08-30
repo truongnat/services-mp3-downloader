@@ -122,11 +122,11 @@ const cloneInnertube = async (customFetch: any, useSession: boolean): Promise<In
     return innertube;
 }
 
-async function downloadYouTubeAudio(options: YouTubeAudioOptions): Promise<YouTubeAudioResult> {
-    const { id, quality = "1080", format = "m4a" } = options;
+export async function downloadYouTubeAudio(options: YouTubeAudioOptions): Promise<YouTubeAudioResult> {
+    const { id, quality = "1080", format = "m4a", client } = options;
 
     // For audio-only downloads, we prefer certain settings
-    let innertubeClient = env.customInnertubeClient || "IOS";
+    let innertubeClient = client || env.customInnertubeClient || "IOS";
 
     // Use session for better audio quality if available
     let useSession = Boolean(env.ytSessionServer);
@@ -436,9 +436,12 @@ async function downloadYouTubeAudio(options: YouTubeAudioOptions): Promise<YouTu
     // Use requested format for filename, but actual format for download
     const audioFormat = format === 'mp3' ? 'mp3' : actualFormat;
 
-    // Create filename
-    const sanitizedTitle = basicInfo.title?.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_') || 'audio';
-    const filename = `${sanitizedTitle}_${id}.${audioFormat}`;
+    // Create filename using just the title
+    const sanitizedTitle = basicInfo.title
+      ?.replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
+      .replace(/[.]{2,}/g, '.') // Replace multiple dots with single dot
+      .trim() || 'audio';
+    const filename = `${sanitizedTitle}.${audioFormat}`;
 
     // Get cover image
     let cover = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
@@ -481,32 +484,11 @@ export async function resolveTrack(url: string): Promise<YouTubeTrackInfo> {
             throw new Error("Invalid YouTube URL - could not extract video ID");
         }
 
-        // Download to get stream URL and metadata
-        const downloadResult = await downloadYouTubeAudio({
-            id: videoId,
-            quality: '720',
-            format: 'mp3'
-        });
-
-        if (downloadResult.error) {
-            throw new Error(downloadResult.error);
-        }
-
-        // Map to our track format
-        const track: YouTubeTrackInfo = {
-            id: videoId,
-            title: downloadResult.fileMetadata?.title || 'Unknown',
-            artist: downloadResult.fileMetadata?.artist || 'Unknown',
-            duration: downloadResult.fileMetadata?.duration || 0,
-            artwork: downloadResult.cover || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-            url: `https://www.youtube.com/watch?v=${videoId}`,
-            streamUrl: Array.isArray(downloadResult.urls) ? downloadResult.urls[0] : downloadResult.urls,
-            format: downloadResult.bestAudio,
-            size: undefined,
-            bitrate: undefined,
-        };
-
-        return track;
+        // Use the simpler resolveVideo approach that only gets metadata
+        // The actual download URLs will be resolved when downloading
+        const videoInfo = await resolveVideo(url);
+        
+        return videoInfo;
     } catch (error) {
         console.error('[YouTube API error]', error);
         throw error;

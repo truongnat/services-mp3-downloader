@@ -36,7 +36,7 @@ export function generateFilename(track: CommonTrackInfo, index: number, settings
 
   // Sanitize filename if enabled
   if (settings.sanitizeFilename) {
-    filename = filename.replace(/[^\w\s\-_.()[\]]/g, '').replace(/\s+/g, '_');
+    filename = filename.replace(/[<>:"/\\|?*]/g, '').replace(/[.]{2,}/g, '.').replace(/\s+/g, '_');
   }
 
   return filename + '.' + settings.format;

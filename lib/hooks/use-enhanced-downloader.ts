@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { EnhancedDownloader, DownloadProgress, DownloadOptions, TrackMetadata } from '@/lib/enhanced-downloader';
+import { useSettings } from '@/lib/hooks/use-settings';
 
 export interface DownloadState {
   isDownloading: boolean;
@@ -30,6 +31,7 @@ export interface UseEnhancedDownloaderReturn {
 }
 
 export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
+  const { settings } = useSettings();
   const [downloadState, setDownloadState] = useState<DownloadState>({
     isDownloading: false,
     currentTrackIndex: -1,
@@ -64,9 +66,9 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
       const downloadOptions: DownloadOptions = {
         url: track.url,
         platform: track.platform,
-        format: 'mp3',
-        quality: 'high',
-        bitrate: '192k',
+        format: settings.format,
+        quality: settings.quality,
+        bitrate: settings.quality === 'high' ? '320k' : settings.quality === 'medium' ? '192k' : '128k',
         ...options,
         onProgress: (progress) => {
           setDownloadState(prev => ({
@@ -83,7 +85,12 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
       const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
       
       // Generate filename and save
-      const filename = EnhancedDownloader.generateFilename(metadata, downloadOptions.format || 'mp3');
+      const filename = EnhancedDownloader.generateFilename(
+        metadata, 
+        downloadOptions.format || settings.format, 
+        settings,
+        0 // Single track download gets index 0
+      );
       EnhancedDownloader.saveFile(blob, filename);
 
       setDownloadState(prev => ({
@@ -104,7 +111,7 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
     } finally {
       setAbortController(null);
     }
-  }, []);
+  }, [settings]);
 
   const downloadPlaylist = useCallback(async (
     tracks: TrackDownloadInfo[], 
@@ -141,9 +148,9 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
           const downloadOptions: DownloadOptions = {
             url: track.url,
             platform: track.platform,
-            format: 'mp3',
-            quality: 'high',
-            bitrate: '192k',
+            format: settings.format,
+            quality: settings.quality,
+            bitrate: settings.quality === 'high' ? '320k' : settings.quality === 'medium' ? '192k' : '128k',
             ...options,
             onProgress: (progress) => {
               setDownloadState(prev => ({
@@ -160,7 +167,12 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
           const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
           
           // Generate filename and save
-          const filename = EnhancedDownloader.generateFilename(metadata, downloadOptions.format || 'mp3');
+          const filename = EnhancedDownloader.generateFilename(
+            metadata, 
+            downloadOptions.format || settings.format, 
+            settings,
+            i // Use loop index for track numbering
+          );
           EnhancedDownloader.saveFile(blob, filename);
 
           completed++;
@@ -218,7 +230,7 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
     } finally {
       setAbortController(null);
     }
-  }, []);
+  }, [settings]);
 
   const cancelDownloads = useCallback(() => {
     if (abortController) {

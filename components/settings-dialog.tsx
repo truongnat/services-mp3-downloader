@@ -1,45 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { AUDIO_FORMATS, AUDIO_QUALITIES, AudioSettings, DEFAULT_SETTINGS, FILENAME_FORMAT_OPTIONS } from "@/lib/settings";
-
+import { AUDIO_FORMATS, AUDIO_QUALITIES, AudioSettings, FILENAME_FORMAT_OPTIONS } from "@/lib/settings";
+import { useSettings } from "@/lib/hooks/use-settings";
+import { Badge } from "./ui/badge";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
 }
 
-export function SettingsDialog({ children, }: SettingsDialogProps) {
-  const [settings, setSettings] = useState<AudioSettings>(DEFAULT_SETTINGS);
-
-  // Load settings from localStorage on client side
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('audioSettings');
-      if (savedSettings) {
-        try {
-          setSettings(JSON.parse(savedSettings));
-        } catch (error) {
-          console.error('Failed to parse saved settings:', error);
-        }
-      }
-    }
-  }, []);
+export function SettingsDialog({ children }: SettingsDialogProps) {
+  const { settings, updateSettings, resetSettings, isLoading } = useSettings();
   const [open, setOpen] = useState(false);
 
-  // Save settings to localStorage and notify parent
-  const updateSettings = (newSettings: AudioSettings) => {
-    setSettings(newSettings);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('audioSettings', JSON.stringify(newSettings));
-    }
-  };
-
+  // Handler functions
   const handleQualityChange = (quality: string) => {
     updateSettings({ ...settings, quality: quality as AudioSettings['quality'] });
   };
@@ -56,21 +36,36 @@ export function SettingsDialog({ children, }: SettingsDialogProps) {
     updateSettings({ ...settings, [key]: value });
   };
 
-  const resetToDefaults = () => {
-    updateSettings(DEFAULT_SETTINGS);
-  };
-
-  const getPreviewFilename = () => {
+  // Computed values
+  const getPreviewFilename = useMemo(() => {
     let preview = settings.filenameFormat;
     preview = preview.replace('{index:03d}', '001');
     preview = preview.replace('{index}', '01');
     preview = preview.replace('{artist}', 'Artist Name');
     preview = preview.replace('{title}', 'Song Title');
     preview = preview.replace('{album}', 'Album Name');
+    
+    // Apply settings
+    if (!settings.includeIndex) {
+      preview = preview.replace(/^\[?\d+\]?\s*[.-]?\s*/, '');
+      preview = preview.replace(/\(\d+\)$/, '');
+    }
+    if (!settings.includeArtist) {
+      preview = preview.replace(/.*?\s*-\s*/, '');
+    }
+    
+    // Sanitize if enabled
+    if (settings.sanitizeFilename) {
+      preview = preview.replace(/[<>:"/\\|?*]/g, '').replace(/[.]{2,}/g, '.').replace(/\s+/g, '_');
+    }
+    
     return preview + '.' + settings.format;
-  };
+  }, [settings]);
 
-  const getCurrentFormatOption = () => FILENAME_FORMAT_OPTIONS.find(option => option.value === settings.filenameFormat)
+  const getCurrentFormatOption = useMemo(() => 
+    FILENAME_FORMAT_OPTIONS.find(option => option.value === settings.filenameFormat),
+    [settings.filenameFormat]
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -79,13 +74,24 @@ export function SettingsDialog({ children, }: SettingsDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Audio Download Settings</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Audio Download Settings
+            <Badge variant="secondary" className="text-xs">
+              v2.0
+            </Badge>
+          </DialogTitle>
           <DialogDescription>
             Customize audio quality, format, and filename patterns for downloads.
+            Settings are automatically saved and synced across tabs.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="space-y-6 py-4">
           {/* Audio Quality */}
           <div className="space-y-2">
             <Label htmlFor="quality">Audio Quality</Label>
@@ -147,10 +153,13 @@ export function SettingsDialog({ children, }: SettingsDialogProps) {
             <div className="text-xs text-muted-foreground space-y-1">
               <div className="flex items-center justify-between">
                 <span>Current format:</span>
-                <span className="font-medium">{getCurrentFormatOption()?.label || 'Custom'}</span>
+                <span className="font-medium">{getCurrentFormatOption?.label || 'Custom'}</span>
               </div>
               <div className="mt-2">
-                <strong>Preview:</strong> <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{getPreviewFilename()}</span>
+                <strong>Preview:</strong> 
+                <span className="font-mono text-xs bg-muted px-2 py-1 rounded ml-1">
+                  {getPreviewFilename}
+                </span>
               </div>
             </div>
           </div>
@@ -198,7 +207,7 @@ export function SettingsDialog({ children, }: SettingsDialogProps) {
 
           {/* Actions */}
           <div className="flex justify-between">
-            <Button variant="outline" onClick={resetToDefaults}>
+            <Button variant="outline" onClick={resetSettings}>
               Reset to Defaults
             </Button>
             <Button onClick={() => setOpen(false)}>
@@ -206,6 +215,7 @@ export function SettingsDialog({ children, }: SettingsDialogProps) {
             </Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

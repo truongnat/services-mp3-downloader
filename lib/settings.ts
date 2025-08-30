@@ -88,9 +88,9 @@ export const FILENAME_FORMAT_OPTIONS = [
 export const DEFAULT_SETTINGS: AudioSettings = {
     quality: 'high',
     format: 'mp3',
-    filenameFormat: '{index}. {artist} - {title}',
-    includeArtist: true,
-    includeIndex: true,
+    filenameFormat: '{title}',
+    includeArtist: false,
+    includeIndex: false,
     sanitizeFilename: true,
 };
 

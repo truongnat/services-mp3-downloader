@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { CommonTrackInfo, ERROR_MESSAGES } from "@/lib/download-utils";
-import { AudioSettings, DEFAULT_SETTINGS } from "@/lib/settings";
 import { detectSoundCloudType, detectYouTubeType } from "@/lib/url-validator";
 import { soundcloudToCommon, youtubeToCommon } from "@/lib/type-adapters";
 
@@ -50,37 +49,6 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
   // URL input state
   const [url, setUrl] = useState("");
 
-  // Get settings from localStorage (same as SettingsDialog)
-  const [audioSettings, setAudioSettings] = useState<AudioSettings>(DEFAULT_SETTINGS);
-
-  // Sync with localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('audioSettings');
-      if (savedSettings) {
-        try {
-          setAudioSettings(JSON.parse(savedSettings));
-        } catch (error) {
-          console.error('Failed to parse saved settings:', error);
-        }
-      }
-    }
-
-    // Listen for storage changes to sync across components
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'audioSettings' && e.newValue) {
-        try {
-          setAudioSettings(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error('Failed to parse settings from storage event:', error);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
   // Protect against page unload during downloads
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -97,8 +65,10 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
   }, [downloadState.isDownloading]);
 
   // Load playlist function with smart URL detection
-  const loadPlaylist = useCallback(async (apiEndpoint: string) => {
-    if (!url.trim()) {
+  const loadPlaylist = useCallback(async (apiEndpoint: string, explicitUrl?: string) => {
+    const urlToUse = explicitUrl || url;
+    
+    if (!urlToUse.trim()) {
       setPlaylist(prev => ({ ...prev, error: ERROR_MESSAGES.INVALID_URL }));
       return;
     }
@@ -111,11 +81,11 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
 
       // Detect if it's SoundCloud and what type
       if (apiEndpoint.includes('soundcloud')) {
-        const urlType = detectSoundCloudType(url.trim());
+        const urlType = detectSoundCloudType(urlToUse.trim());
 
         if (urlType === 'track') {
           // Definitely a track - call track API
-          response = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url.trim())}`);
+          response = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(urlToUse.trim())}`);
           const trackData = await response.json();
 
           if (!response.ok) {
@@ -136,7 +106,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
           };
         } else if (urlType === 'playlist') {
           // Definitely a playlist - call playlist API
-          response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url.trim())}`);
+          response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
           data = await response.json();
 
           if (!response.ok) {
@@ -146,7 +116,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
           // Could be either - try playlist first, then track
           try {
             // Try playlist API first
-            response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url.trim())}`);
+            response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
             data = await response.json();
 
             if (!response.ok) {
@@ -155,7 +125,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
           } catch (playlistError) {
             // If playlist fails, try track API
             try {
-              response = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url.trim())}`);
+              response = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(urlToUse.trim())}`);
               const trackData = await response.json();
 
               if (!response.ok) {
@@ -183,11 +153,11 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
         }
       } else if (apiEndpoint.includes('youtube')) {
         // Handle YouTube URLs
-        const urlType = detectYouTubeType(url.trim());
+        const urlType = detectYouTubeType(urlToUse.trim());
 
         if (urlType === 'video') {
           // Single video - call video API and convert to playlist format
-          response = await fetch(`/api/youtube/video?url=${encodeURIComponent(url.trim())}`);
+          response = await fetch(`/api/youtube/video?url=${encodeURIComponent(urlToUse.trim())}`);
           const videoData = await response.json();
 
           if (!response.ok) {
@@ -208,7 +178,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
           };
         } else if (urlType === 'playlist') {
           // Playlist - call playlist API
-          response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url.trim())}`);
+          response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
           data = await response.json();
 
           if (!response.ok) {
@@ -219,7 +189,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
         }
       } else {
         // For other platforms, use original logic
-        response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url.trim())}`);
+        response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
         data = await response.json();
 
         if (!response.ok) {
@@ -325,7 +295,6 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
     playlist,
     downloadState,
     url,
-    audioSettings,
     allDownloadsComplete,
 
     // Actions

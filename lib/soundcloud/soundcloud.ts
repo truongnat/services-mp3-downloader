@@ -4,11 +4,18 @@ import type { SoundcloudPlaylist, SoundcloudTrack } from "soundcloud.ts";
 
 const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || "59BqQCyB9AWNYAglJEiHbp1h6keJHfrU";
 
+if (!SOUNDCLOUD_CLIENT_ID) {
+  throw new Error('SOUNDCLOUD_CLIENT_ID environment variable is required');
+}
+
 interface SoundCloudPlaylistApi {
   tracks: SoundcloudTrack[];
 }
 
+// Initialize SoundCloud client with environment variable only
 const sc = new Soundcloud(SOUNDCLOUD_CLIENT_ID);
+
+console.log('SoundCloud client initialized with env client ID:', SOUNDCLOUD_CLIENT_ID.substring(0, 8) + '...');
 
 // Expand short URLs and clean up tracking parameters
 async function cleanUrl(url: string): Promise<string> {
@@ -31,11 +38,25 @@ async function cleanUrl(url: string): Promise<string> {
     }
 
     const urlObj = new URL(url);
-    ["si", "utm_source", "utm_medium", "utm_campaign"].forEach(param => {
+    // Remove all tracking and sharing parameters
+    ["si", "utm_source", "utm_medium", "utm_campaign", "ref", "in", "from"].forEach(param => {
       urlObj.searchParams.delete(param);
     });
-    return urlObj.toString().split("?")[0];
-  } catch {
+    
+    // Clean up the URL completely - remove all parameters for better compatibility
+    let cleanedUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+    
+    // Ensure proper format for SoundCloud URLs
+    if (cleanedUrl.endsWith('/')) {
+      cleanedUrl = cleanedUrl.slice(0, -1);
+    }
+    
+    console.log('Original URL:', url);
+    console.log('Cleaned URL:', cleanedUrl);
+    
+    return cleanedUrl;
+  } catch (error) {
+    console.log('Error cleaning URL:', error);
     return url;
   }
 }
@@ -102,28 +123,76 @@ export async function resolvePlaylist(
 ): Promise<SoundCloudPlaylistApiResponse> {
   try {
     const clean = await cleanUrl(url);
+    console.log('Attempting to resolve SoundCloud URL:', clean);
+    console.log('Using client ID:', SOUNDCLOUD_CLIENT_ID.substring(0, 8) + '...');
 
-    // Try to resolve as playlist first
+    // First, try the generic resolve method which is more reliable
     try {
-      const playlist = await retry(() => sc.playlists.get(clean) as Promise<SoundcloudPlaylist>, 2, 500);
+      console.log('Using sc.resolve.get method...');
+      const resolved = await retry(() => sc.resolve.get(clean), 3, 1000);
+      console.log('Resolve response:', resolved ? { 
+        kind: resolved.kind, 
+        id: resolved.id, 
+        title: resolved.title,
+        tracksLength: resolved.tracks?.length || 0
+      } : 'null');
+      
+      if (resolved) {
+        if (resolved.kind === "playlist" && Array.isArray(resolved.tracks)) {
+          console.log('Successfully resolved as playlist via resolve method');
+          return await handlePlaylist(resolved, clean, maxTracks);
+        } else if (resolved.kind === "track") {
+          console.log('Successfully resolved as track via resolve method');
+          return await handleSingleTrack(resolved);
+        } else {
+          console.log('Resolved but unknown type:', resolved.kind);
+        }
+      }
+    } catch (resolveError) {
+      console.log('General resolve failed:', resolveError instanceof Error ? resolveError.message : resolveError);
+    }
+
+    // Try to resolve as playlist using specific playlist method
+    try {
+      console.log('Trying specific playlist method...');
+      const playlist = await retry(() => sc.playlists.get(clean) as Promise<SoundcloudPlaylist>, 3, 1000);
+      console.log('Playlist response:', playlist ? { kind: playlist.kind, id: playlist.id, title: playlist.title } : 'null');
+      
       if (playlist && playlist.kind === "playlist" && Array.isArray(playlist.tracks)) {
+        console.log('Successfully resolved as playlist');
         return await handlePlaylist(playlist, clean, maxTracks);
+      } else {
+        console.log('Response is not a valid playlist:', playlist?.kind);
       }
     } catch (playlistError) {
-      console.log('Not a playlist, trying as single track...');
+      console.log('Playlist resolution failed:', playlistError instanceof Error ? playlistError.message : playlistError);
     }
 
-    // If not a playlist, try to resolve as single track
+    // Try to resolve as single track using specific track method
     try {
-      const track = await retry(() => sc.tracks.get(clean) as Promise<SoundcloudTrack>, 2, 500);
+      console.log('Trying specific track method...');
+      const track = await retry(() => sc.tracks.get(clean) as Promise<SoundcloudTrack>, 3, 1000);
+      console.log('Track response:', track ? { kind: track.kind, id: track.id, title: track.title } : 'null');
+      
       if (track && track.kind === "track") {
+        console.log('Successfully resolved as track');
         return await handleSingleTrack(track);
+      } else {
+        console.log('Response is not a valid track:', track?.kind);
       }
     } catch (trackError) {
-      console.log('Not a track either');
+      console.log('Track resolution failed:', trackError instanceof Error ? trackError.message : trackError);
     }
 
-    throw new Error("URL is not a valid SoundCloud playlist or track");
+    // If all methods fail, provide detailed error information
+    const errorDetails = {
+      originalUrl: url,
+      cleanedUrl: clean,
+      clientId: SOUNDCLOUD_CLIENT_ID ? 'Present' : 'Missing'
+    };
+    
+    console.error('All resolution methods failed. Details:', errorDetails);
+    throw new Error(`Unable to resolve SoundCloud URL: ${clean}. This could be because:\n- The playlist/track is private or deleted\n- The SoundCloud API is temporarily unavailable\n- Invalid URL format\n- Client ID is expired (update SOUNDCLOUD_CLIENT_ID in .env)\nPlease verify the URL is public and try again.`);
   } catch (err) {
     console.error("Error resolving SoundCloud URL:", err);
     throw err;
@@ -137,12 +206,12 @@ async function handlePlaylist(
   maxTracks: number
 ): Promise<SoundCloudPlaylistApiResponse> {
   try {
-    // 2. Map playlist info
+    // 2. Map playlist info with user avatar fallback
     const playlistInfo: SoundCloudPlaylistInfo = {
       id: String(playlist.id),
       title: playlist.title,
       description: playlist.description || "",
-      artwork: playlist.artwork_url || "",
+      artwork: playlist.artwork_url || playlist.user?.avatar_url || "",
       tracksCount: playlist.track_count || playlist.tracks.length,
     };
     // 3. Fetch all tracks if missing, with configurable limit
@@ -155,7 +224,7 @@ async function handlePlaylist(
       let streamUrl: string | null = null;
       try {
         if (track.media && Array.isArray(track.media.transcodings)) {
-          const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+          const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
           if (progressive) {
             const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
             const res = await fetch(url);
@@ -171,7 +240,7 @@ async function handlePlaylist(
         title: track.title,
         artist: track.user?.username || "",
         duration: track.duration,
-        artwork: track.artwork_url || playlist.artwork_url || "",
+        artwork: track.artwork_url || playlist.artwork_url || track.user?.avatar_url || "",
         url: track.permalink_url,
         streamUrl,
         size: undefined,
@@ -192,7 +261,7 @@ async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlay
     let streamUrl: string | null = null;
     try {
       if (track.media && Array.isArray(track.media.transcodings)) {
-        const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+        const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
         if (progressive) {
           const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
           const res = await fetch(url);
@@ -209,7 +278,7 @@ async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlay
       id: String(track.id),
       title: track.title,
       description: `Single track: ${track.title}`,
-      artwork: track.artwork_url || "",
+      artwork: track.artwork_url || track.user?.avatar_url || "",
       tracksCount: 1,
     };
 
@@ -218,7 +287,7 @@ async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlay
       title: track.title,
       artist: track.user?.username || "",
       duration: track.duration,
-      artwork: track.artwork_url || "",
+      artwork: track.artwork_url || track.user?.avatar_url || "",
       url: track.permalink_url,
       streamUrl,
       size: undefined,
@@ -236,7 +305,7 @@ async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlay
 // Download 1 track: lấy stream url thực sự
 export async function downloadTrack(track: SoundcloudTrack): Promise<string | null> {
   if (!track.media || !Array.isArray(track.media.transcodings)) return null;
-  const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+  const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
   if (!progressive) return null;
   const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
   try {
@@ -252,7 +321,7 @@ export async function downloadTrack(track: SoundcloudTrack): Promise<string | nu
 // Download 1 track: lấy stream url thực sự và tải file mp3 với progress
 export async function downloadTrackWithProgress(track: SoundcloudTrack, onProgress?: (percent: number) => void): Promise<void> {
   if (!track.media || !Array.isArray(track.media.transcodings)) return;
-  const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+  const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
   if (!progressive) return;
   const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
   try {
@@ -279,11 +348,16 @@ export async function downloadTrackWithProgress(track: SoundcloudTrack, onProgre
         }
       }
     }
-    // Gộp chunk và tạo file mp3
+    // Gộp chunk và tạo file mp3 với tên là title của bài hát
     const blob = new Blob(chunks, { type: "audio/mpeg" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${track.title}.mp3`;
+    // Sanitize filename và chỉ dùng title
+    const sanitizedTitle = track.title
+      .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
+      .replace(/[.]{2,}/g, '.') // Replace multiple dots with single dot
+      .trim();
+    a.download = `${sanitizedTitle}.mp3`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -310,27 +384,48 @@ export async function searchTracks(
   offset = 0
 ): Promise<{ tracks: SoundCloudTrackInfo[]; hasMore: boolean }> {
   try {
-    const searchResults = await retry(() => 
+    const searchResponse = await retry(() => 
       sc.tracks.search({
         q: query,
         limit,
         offset
-      }) as Promise<SoundcloudTrack[]>,
+      }),
       2,
       500
     );
 
-    if (!Array.isArray(searchResults)) {
-      throw new Error("Search results is not an array");
+    console.log('Search response structure:', {
+      type: typeof searchResponse,
+      isArray: Array.isArray(searchResponse),
+      hasCollection: searchResponse && 'collection' in searchResponse,
+      keys: searchResponse ? Object.keys(searchResponse) : []
+    });
+
+    // Handle different response structures
+    let searchResults: any[];
+    if (Array.isArray(searchResponse)) {
+      searchResults = searchResponse;
+    } else if (searchResponse && Array.isArray((searchResponse as any).collection)) {
+      searchResults = (searchResponse as any).collection;
+    } else if (searchResponse && Array.isArray((searchResponse as any).tracks)) {
+      searchResults = (searchResponse as any).tracks;
+    } else {
+      console.error('Unexpected search response structure:', searchResponse);
+      throw new Error(`Search API returned unexpected structure: ${typeof searchResponse}`);
     }
+
+    console.log(`Found ${searchResults.length} search results`);
 
     // Filter out tracks that aren't streamable
     const streamableTracks = searchResults.filter(track => 
+      track && 
       track.streamable && 
       track.media && 
       Array.isArray(track.media.transcodings) &&
       track.media.transcodings.length > 0
     );
+
+    console.log(`${streamableTracks.length} tracks are streamable`);
 
     // Map tracks to our format
     const tracks: SoundCloudTrackInfo[] = await Promise.all(
@@ -338,7 +433,7 @@ export async function searchTracks(
         let streamUrl: string | null = null;
         try {
           if (track.media && Array.isArray(track.media.transcodings)) {
-            const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+            const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
             if (progressive) {
               const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
               const res = await fetch(url);
@@ -355,7 +450,7 @@ export async function searchTracks(
           title: track.title,
           artist: track.user?.username || "",
           duration: track.duration,
-          artwork: track.artwork_url || "",
+          artwork: track.artwork_url || track.user?.avatar_url || "",
           url: track.permalink_url,
           streamUrl,
           size: undefined,
@@ -387,7 +482,7 @@ export async function resolveTrack(url: string) {
     let streamUrl: string | null = null;
     try {
       if (track.media && Array.isArray(track.media.transcodings)) {
-        const progressive = track.media.transcodings.find(t => t.format.protocol === "progressive");
+        const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
         if (progressive) {
           const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
           const res = await fetch(url);
@@ -403,7 +498,7 @@ export async function resolveTrack(url: string) {
       title: track.title,
       artist: track.user?.username || "",
       duration: track.duration,
-      artwork: track.artwork_url || "",
+      artwork: track.artwork_url || track.user?.avatar_url || "",
       url: track.permalink_url,
       streamUrl,
       size: undefined,

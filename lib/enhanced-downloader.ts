@@ -1,6 +1,9 @@
 // Browser-compatible enhanced downloader
 // Uses API endpoints instead of direct Node.js library imports
 
+import { AudioSettings } from '@/lib/settings';
+import { CommonTrackInfo } from '@/lib/download-utils';
+
 const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || "59BqQCyB9AWNYAglJEiHbp1h6keJHfrU";
 
 export interface DownloadProgress {
@@ -63,17 +66,25 @@ export class EnhancedDownloader {
         throw new Error('Invalid YouTube URL');
       }
 
-      // For browser environment, we'll fetch stream URL via API
-      const response = await fetch(`/api/youtube/track?url=${encodeURIComponent(url)}`, {
+      // Get basic track information first
+      const trackResponse = await fetch(`/api/youtube/track?url=${encodeURIComponent(url)}`, {
         signal: abortSignal
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to get track information');
+      if (!trackResponse.ok) {
+        if (trackResponse.status === 400) {
+          throw new Error('Invalid YouTube URL format');
+        } else if (trackResponse.status === 404) {
+          throw new Error('Video not found or unavailable');
+        } else if (trackResponse.status >= 500) {
+          throw new Error('Server error - please try again later');
+        } else {
+          throw new Error('Failed to get track information');
+        }
       }
       
-      const data = await response.json();
-      const trackInfo = data.track;
+      const trackData = await trackResponse.json();
+      const trackInfo = trackData.track;
       
       const metadata: TrackMetadata = {
         id: trackInfo.id,
@@ -83,16 +94,27 @@ export class EnhancedDownloader {
         thumbnail: trackInfo.artwork,
       };
 
-      // Download the audio stream
+      // Download directly through the enhanced download endpoint
+      // This endpoint will generate fresh stream URLs and download immediately
       const audioBlob = await this.downloadStreamWithProgress(
-        trackInfo.streamUrl, 
+        `/api/youtube/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(metadata.title + '.mp3')}&quality=${quality}&format=${format}`, 
         onProgress, 
         abortSignal
       );
 
       return { blob: audioBlob, metadata };
     } catch (error) {
-      throw new Error(`YouTube download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Handle different types of errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error - please check your internet connection and try again');
+      } else if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Download was cancelled');
+      } else if (error instanceof Error) {
+        // Re-throw our custom error messages
+        throw error;
+      } else {
+        throw new Error(`YouTube download failed: Unknown error`);
+      }
     }
   }
 
@@ -161,7 +183,34 @@ export class EnhancedDownloader {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error('Failed to fetch audio stream');
+      // Handle API error responses (JSON) vs stream responses
+      const contentType = response.headers.get('Content-Type');
+      
+      if (contentType?.includes('application/json')) {
+        const errorData = await response.json();
+        
+        // Handle specific YouTube error codes
+        if (errorData.code === 'youtube_blocked') {
+          throw new Error(errorData.error + ' YouTube downloads have approximately 30-50% success rate due to their restrictions.');
+        } else if (errorData.code === 'rate_limited') {
+          throw new Error('Too many requests - please wait a few minutes before trying again.');
+        } else if (errorData.retryable) {
+          throw new Error(errorData.error + ' You can try downloading this track again.');
+        } else {
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+      }
+      
+      // Provide more specific error messages for stream responses
+      if (response.status === 403) {
+        throw new Error('Access denied - this content may be restricted or require authentication');
+      } else if (response.status === 404) {
+        throw new Error('Audio stream not found - the video may have been removed');
+      } else if (response.status >= 500) {
+        throw new Error('YouTube server error - please try again later');
+      } else {
+        throw new Error(`Failed to fetch audio stream (${response.status})`);
+      }
     }
 
     const contentLength = response.headers.get('Content-Length');
@@ -242,11 +291,39 @@ export class EnhancedDownloader {
   }
 
   /**
-   * Generate filename from metadata
+   * Generate filename from metadata with settings support
    */
-  static generateFilename(metadata: TrackMetadata, format: string): string {
-    const sanitizedTitle = metadata.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-    const sanitizedArtist = metadata.artist.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-    return `${sanitizedArtist} - ${sanitizedTitle}.${format}`;
+  static generateFilename(
+    metadata: TrackMetadata, 
+    format: string, 
+    settings: AudioSettings,
+    index?: number
+  ): string {
+    let filename = settings.filenameFormat;
+
+    // Replace variables with proper formatting
+    if (index !== undefined) {
+      filename = filename.replace('{index:03d}', String(index + 1).padStart(3, '0'));
+      filename = filename.replace('{index}', String(index + 1).padStart(2, '0'));
+    }
+    filename = filename.replace('{artist}', metadata.artist || 'Unknown Artist');
+    filename = filename.replace('{title}', metadata.title || 'Unknown Title');
+    filename = filename.replace('{album}', 'Unknown Album'); // Most platforms don't have album info
+
+    // Apply settings
+    if (!settings.includeIndex) {
+      filename = filename.replace(/^\[?\d+\]?\s*[.-]?\s*/, ''); // Remove leading number with various formats
+      filename = filename.replace(/\(\d+\)$/, ''); // Remove trailing number in parentheses
+    }
+    if (!settings.includeArtist) {
+      filename = filename.replace(/.*?\s*-\s*/, ''); // Remove artist part
+    }
+
+    // Sanitize filename if enabled
+    if (settings.sanitizeFilename) {
+      filename = filename.replace(/[<>:"/\\|?*]/g, '').replace(/[.]{2,}/g, '.').replace(/\s+/g, '_');
+    }
+
+    return filename + '.' + format;
   }
 }

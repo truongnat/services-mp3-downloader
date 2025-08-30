@@ -30,6 +30,7 @@ export interface YouTubeAudioOptions {
   quality?: 'max' | '1080' | '720' | '480' | '360' | '240' | '144';
   codec?: 'h264' | 'vp9' | 'av1';
   format?: 'mp3' | 'm4a' | 'opus';
+  client?: string;
 }
 
 export interface YouTubeAudioResult {
