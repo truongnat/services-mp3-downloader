@@ -9,9 +9,18 @@ import PlaylistInput from "@/components/playlist/playlist-input";
 import PlaylistHeader from "@/components/playlist/playlist-header";
 import TrackList from "@/components/playlist/track-list";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
 
 interface PlaylistDownloaderSoundCloudProps {
   setDisableTabs?: (v: boolean) => void;
+}
+
+// Search results interface
+interface SearchResult {
+  tracks: CommonTrackInfo[];
+  hasMore: boolean;
+  total: number;
 }
 
 export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: PlaylistDownloaderSoundCloudProps) {
@@ -30,6 +39,46 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     resetDownloadState
   } = useEnhancedDownloader();
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [currentMode, setCurrentMode] = useState<'url' | 'search'>('url');
+
+  // Handle search
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    setSearchError(null);
+    setSearchResults(null);
+    
+    try {
+      const response = await fetch(`/api/soundcloud/search?q=${encodeURIComponent(searchQuery.trim())}&limit=50`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Search failed');
+      }
+      
+      setSearchResults(data);
+      setCurrentMode('search');
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : 'Search failed');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchQuery]);
+
+  // Clear search
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchResults(null);
+    setSearchError(null);
+    setCurrentMode('url');
+  }, []);
+
   // Handle single track download
   const handleDownloadTrack = useCallback(async (track: CommonTrackInfo) => {
     const trackInfo: TrackDownloadInfo = {
@@ -43,14 +92,15 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     await downloadTrack(trackInfo);
   }, [downloadTrack]);
 
-  // Handle download all tracks
+  // Handle download all tracks (for search results or playlist)
   const handleDownloadAll = useCallback(async () => {
-    if (playlist.tracks.length === 0) return;
+    const tracks = currentMode === 'search' ? searchResults?.tracks : playlist.tracks;
+    if (!tracks || tracks.length === 0) return;
 
     setDisableTabs?.(true);
     
     try {
-      const tracksInfo: TrackDownloadInfo[] = playlist.tracks.map(track => ({
+      const tracksInfo: TrackDownloadInfo[] = tracks.map(track => ({
         id: track.id,
         url: track.url,
         title: track.title,
@@ -62,10 +112,11 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     } finally {
       setDisableTabs?.(false);
     }
-  }, [playlist.tracks, downloadPlaylist, setDisableTabs]);
+  }, [playlist.tracks, searchResults?.tracks, currentMode, downloadPlaylist, setDisableTabs]);
 
   // Handle load playlist
   const handleLoadPlaylist = useCallback(() => {
+    setCurrentMode('url');
     loadPlaylist('/api/soundcloud/playlist');
   }, [loadPlaylist]);
 
@@ -89,14 +140,25 @@ export default function PlaylistDownloaderSoundCloud({ setDisableTabs }: Playlis
     return { status: 'idle' as const, progress: 0 };
   }, [downloadState]);
 
+  // Determine which tracks and header info to show
+  const currentTracks = currentMode === 'search' ? searchResults?.tracks || [] : playlist.tracks;
+  const headerInfo = currentMode === 'search' 
+    ? {
+        title: `Search: "${searchQuery}"`,
+        description: `Found ${searchResults?.tracks.length || 0} tracks`,
+        artwork: "",
+        tracksCount: searchResults?.tracks.length || 0
+      }
+    : playlist.info;
+
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6">SoundCloud Playlist Downloader</h1>
+      <h1 className="text-2xl font-bold mb-6">SoundCloud Downloader</h1>
 
       {/* Enhanced Download Notice */}
       <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-md">
         <p className="text-sm text-orange-700">
-          ⭐ <strong>Enhanced with ffmpeg-static + soundcloud.ts</strong> - Better audio quality and progress tracking
+          ⭐ <strong>Enhanced with soundcloud.ts</strong> - Search tracks, paste URLs for playlists/tracks
         </p>
       </div>
 
