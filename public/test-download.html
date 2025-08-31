@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundCloud Download Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { display: flex; flex-direction: column; gap: 20px; }
+        input, button { padding: 10px; font-size: 16px; }
+        .progress { 
+            width: 100%; 
+            height: 20px; 
+            background: #f0f0f0; 
+            border-radius: 10px; 
+            overflow: hidden; 
+        }
+        .progress-bar { 
+            height: 100%; 
+            background: #4CAF50; 
+            transition: width 0.3s ease; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SoundCloud Optimized Download Test</h1>
+        <div>
+            <label for="urlInput">SoundCloud URL:</label>
+            <input 
+                type="text" 
+                id="urlInput" 
+                placeholder="Paste SoundCloud track URL here..."
+                value="https://soundcloud.com/example/track"
+            />
+        </div>
+        <button id="downloadBtn" onclick="testDownload()">Download Track</button>
+        
+        <div id="status" class="status info" style="display: none;">
+            Ready to test...
+        </div>
+        
+        <div class="progress" id="progressContainer" style="display: none;">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <div id="progressText" style="display: none;">
+            <div>Progress: <span id="percentText">0%</span></div>
+            <div>Downloaded: <span id="downloadedText">0 B</span> / <span id="totalText">0 B</span></div>
+            <div>Speed: <span id="speedText">0 B/s</span></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Test the optimized downloader
+        async function testDownload() {
+            const urlInput = document.getElementById('urlInput');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const status = document.getElementById('status');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const percentText = document.getElementById('percentText');
+            const downloadedText = document.getElementById('downloadedText');
+            const totalText = document.getElementById('totalText');
+            const speedText = document.getElementById('speedText');
+            
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showStatus('Please enter a valid SoundCloud URL', 'error');
+                return;
+            }
+            
+            try {
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Downloading...';
+                showStatus('Starting download...', 'info');
+                progressContainer.style.display = 'block';
+                progressText.style.display = 'block';
+                
+                // Test direct API call first
+                console.log('Testing direct API call...');
+                const response = await fetch(`/api/soundcloud/download?direct=true&url=${encodeURIComponent(url)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`API failed: ${response.statusText}`);
+                }
+                
+                const downloadInfo = await response.json();
+                console.log('Download info received:', downloadInfo);
+                showStatus(`Got download info: ${downloadInfo.metadata.title} by ${downloadInfo.metadata.artist}`, 'success');
+                
+                // Now test the actual download
+                console.log('Starting direct stream download...');
+                const streamResponse = await fetch(downloadInfo.streamUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'audio/*,*/*;q=0.9',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Referer': 'https://soundcloud.com/',
+                    },
+                });
+                
+                if (!streamResponse.ok) {
+                    throw new Error(`Stream download failed: ${streamResponse.statusText}`);
+                }
+                
+                const contentLength = streamResponse.headers.get('content-length');
+                const total = contentLength ? parseInt(contentLength, 10) : 0;
+                
+                if (!streamResponse.body) {
+                    throw new Error('No response body');
+                }
+                
+                const reader = streamResponse.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+                const startTime = Date.now();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    chunks.push(value);
+                    loaded += value.length;
+                    
+                    // Update progress
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const speed = elapsed > 0 ? loaded / elapsed : 0;
+                    const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+                    
+                    progressBar.style.width = percent + '%';
+                    percentText.textContent = percent + '%';
+                    downloadedText.textContent = formatFileSize(loaded);
+                    totalText.textContent = formatFileSize(total);
+                    speedText.textContent = formatSpeed(speed);
+                }
+                
+                // Create blob and trigger download
+                const blob = new Blob(chunks, { type: 'audio/mpeg' });
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                
+                link.href = blobUrl;
+                link.download = downloadInfo.filename;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);
+                }, 100);
+                
+                showStatus('Download completed successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Download failed:', error);
+                showStatus(`Download failed: ${error.message}`, 'error');
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download Track';
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressText.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+        
+        function formatFileSize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            
+            return `${size.toFixed(1)} ${units[unitIndex]}`;
+        }
+        
+        function formatSpeed(bytesPerSecond) {
+            const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+            let speed = bytesPerSecond;
+            let unitIndex = 0;
+            
+            while (speed >= 1024 && unitIndex < units.length - 1) {
+                speed /= 1024;
+                unitIndex++;
+            }
+            
+            return `${speed.toFixed(1)} ${units[unitIndex]}`;
+        }
+        
+        // Make function global
+        window.testDownload = testDownload;
+    </script>
+</body>
+</html>
