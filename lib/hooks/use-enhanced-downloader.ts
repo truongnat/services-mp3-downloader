@@ -84,14 +84,17 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
 
       const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
       
-      // Generate filename and save
-      const filename = EnhancedDownloader.generateFilename(
-        metadata, 
-        downloadOptions.format || settings.format, 
-        settings,
-        0 // Single track download gets index 0
-      );
-      EnhancedDownloader.saveFile(blob, filename);
+      // For SoundCloud, the optimized downloader handles file saving automatically
+      // For other platforms, generate filename and save manually
+      if (track.platform !== 'soundcloud' && blob.size > 0) {
+        const filename = EnhancedDownloader.generateFilename(
+          metadata, 
+          downloadOptions.format || settings.format, 
+          settings,
+          0 // Single track download gets index 0
+        );
+        EnhancedDownloader.saveFile(blob, filename);
+      }
 
       setDownloadState(prev => ({
         ...prev,
@@ -166,14 +169,17 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
 
           const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
           
-          // Generate filename and save
-          const filename = EnhancedDownloader.generateFilename(
-            metadata, 
-            downloadOptions.format || settings.format, 
-            settings,
-            i // Use loop index for track numbering
-          );
-          EnhancedDownloader.saveFile(blob, filename);
+          // For SoundCloud, the optimized downloader handles file saving automatically
+          // For other platforms, generate filename and save manually
+          if (track.platform !== 'soundcloud' && blob.size > 0) {
+            const filename = EnhancedDownloader.generateFilename(
+              metadata, 
+              downloadOptions.format || settings.format, 
+              settings,
+              i // Use loop index for track numbering
+            );
+            EnhancedDownloader.saveFile(blob, filename);
+          }
 
           completed++;
           

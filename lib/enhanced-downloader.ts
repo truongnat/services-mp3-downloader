@@ -41,6 +41,38 @@ export class EnhancedDownloader {
     const { url, platform, format = 'mp3', quality = 'medium', onProgress, abortSignal } = options;
 
     try {
+      if (platform === 'soundcloud') {
+        // Use optimized SoundCloud downloader that downloads directly from stream
+        await downloadSoundCloudTrackOptimized(url, (progress) => {
+          if (onProgress) {
+            onProgress({
+              percent: progress.percent,
+              downloaded: progress.loaded,
+              total: progress.total,
+              speed: progress.speed,
+            });
+          }
+        }, abortSignal);
+
+        // For SoundCloud optimized downloads, we trigger the download directly
+        // Return empty blob and basic metadata since file is already downloaded
+        const trackResponse = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url)}`);
+        const trackData = await trackResponse.json();
+        
+        const metadata: TrackMetadata = {
+          title: trackData.track?.title || 'Unknown',
+          artist: trackData.track?.artist || 'Unknown',
+          duration: trackData.track?.duration ? Math.floor(trackData.track.duration / 1000) : 0,
+          artwork: trackData.track?.artwork,
+        };
+
+        // Return empty blob since download was triggered directly
+        return { 
+          blob: new Blob([], { type: 'audio/mpeg' }), 
+          metadata 
+        };
+      }
+
       let downloadUrl: string;
       let metadata: TrackMetadata;
 
@@ -68,38 +100,11 @@ export class EnhancedDownloader {
           duration: infoData.data.duration || 0,
           artwork: infoData.data.artwork,
         };
-      } else if (platform === 'soundcloud') {
-        // For SoundCloud, use the download proxy endpoint  
-        // Get metadata first
-        const trackResponse = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url)}`);
-        const trackData = await trackResponse.json();
-        
-        if (!trackResponse.ok) {
-          throw new Error(trackData.error || 'Failed to get track info');
-        }
-
-        const track = trackData.track;
-        
-        metadata = {
-          title: track.title || 'Unknown',
-          artist: track.artist || 'Unknown',
-          duration: track.duration ? Math.floor(track.duration / 1000) : 0,
-          artwork: track.artwork,
-        };
-        
-        const params = new URLSearchParams({
-          url,
-          filename: `${metadata.title}.${format}`,
-        });
-        
-        downloadUrl = `/api/soundcloud/download?${params.toString()}`;
-        
-        console.log('SoundCloud download URL:', downloadUrl);
       } else {
         throw new Error(`Unsupported platform: ${platform}`);
       }
 
-      // Download the file
+      // Download the file for YouTube
       console.log('Starting download from URL:', downloadUrl);
       const response = await fetch(downloadUrl, {
         signal: abortSignal,
