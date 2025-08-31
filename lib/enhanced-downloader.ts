@@ -1,5 +1,6 @@
 // Enhanced downloader with improved functionality
 import { AudioSettings } from "@/lib/settings";
+import { downloadSoundCloudTrackOptimized, formatSpeed, formatFileSize } from "@/lib/soundcloud/optimized-downloader";
 
 export interface DownloadProgress {
   percent: number;
