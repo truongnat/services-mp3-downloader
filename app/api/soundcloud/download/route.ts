@@ -60,6 +60,7 @@ function createContentDispositionHeader(filename: string): string {
 export async function GET(req: NextRequest) {
   const trackUrl = req.nextUrl.searchParams.get("url");
   const rawFilename = req.nextUrl.searchParams.get("filename");
+  const directStream = req.nextUrl.searchParams.get("direct") === "true";
 
   if (!trackUrl) {
     return NextResponse.json({ error: "Missing track URL" }, { status: 400 });
@@ -81,6 +82,24 @@ export async function GET(req: NextRequest) {
     console.log(`[SoundCloud Download] Track info: ${track.title} by ${track.artist}`);
     console.log(`[SoundCloud Download] Stream URL: ${track.streamUrl}`);
 
+    // If direct stream is requested, return the stream URL and metadata
+    if (directStream) {
+      const baseFilename = rawFilename || `${track.title}.mp3`;
+      const sanitizedFilename = sanitizeFilename(baseFilename);
+      
+      return NextResponse.json({
+        streamUrl: track.streamUrl,
+        filename: sanitizedFilename,
+        metadata: {
+          title: track.title,
+          artist: track.artist,
+          duration: track.duration,
+          artwork: track.artwork
+        }
+      });
+    }
+
+    // Fallback to server-side streaming for compatibility
     // Fetch the audio stream from SoundCloud
     const audioResponse = await fetch(track.streamUrl, {
       headers: {
