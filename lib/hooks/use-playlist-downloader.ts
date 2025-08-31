@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { CommonTrackInfo, ERROR_MESSAGES } from "@/lib/download-utils";
-import { detectSoundCloudType, detectYouTubeType } from "@/lib/url-validator";
-import { soundcloudToCommon, youtubeToCommon } from "@/lib/type-adapters";
+import { CommonTrackInfo, ERROR_MESSAGES } from "@/types/common";
+import { detectSoundCloudType } from "@/lib/url-validator";
+import { soundcloudToCommon } from "@/lib/type-adapters";
 
 // Download status for individual tracks
 export interface TrackDownloadStatus {
@@ -10,9 +10,19 @@ export interface TrackDownloadStatus {
   error?: string;
 }
 
+// Playlist info interface
+interface PlaylistInfo {
+  id: string;
+  title: string;
+  description?: string;
+  artwork?: string;
+  tracksCount: number;
+  totalDuration?: string;
+}
+
 // Playlist state
 export interface PlaylistState<T = CommonTrackInfo> {
-  info: any;
+  info: PlaylistInfo | null;
   tracks: T[];
   isLoading: boolean;
   error: string | null;
@@ -64,7 +74,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [downloadState.isDownloading]);
 
-  // Load playlist function with smart URL detection
+  // Load playlist function for SoundCloud only
   const loadPlaylist = useCallback(async (apiEndpoint: string, explicitUrl?: string) => {
     const urlToUse = explicitUrl || url;
     
@@ -79,7 +89,7 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
       let response;
       let data;
 
-      // Detect if it's SoundCloud and what type
+      // Only handle SoundCloud URLs
       if (apiEndpoint.includes('soundcloud')) {
         const urlType = detectSoundCloudType(urlToUse.trim());
 
@@ -151,50 +161,8 @@ export function usePlaylistDownloader<T extends CommonTrackInfo>() {
         } else {
           throw new Error('Invalid SoundCloud URL format');
         }
-      } else if (apiEndpoint.includes('youtube')) {
-        // Handle YouTube URLs
-        const urlType = detectYouTubeType(urlToUse.trim());
-
-        if (urlType === 'video') {
-          // Single video - call video API and convert to playlist format
-          response = await fetch(`/api/youtube/video?url=${encodeURIComponent(urlToUse.trim())}`);
-          const videoData = await response.json();
-
-          if (!response.ok) {
-            throw new Error(videoData.error || ERROR_MESSAGES.FETCH_FAILED);
-          }
-
-          // Convert single video to playlist format
-          const video = youtubeToCommon(videoData.video);
-          data = {
-            playlistInfo: {
-              id: video.id,
-              title: video.title,
-              description: `Single video: ${video.title}`,
-              artwork: video.artwork,
-              tracksCount: 1
-            },
-            tracks: [video]
-          };
-        } else if (urlType === 'playlist') {
-          // Playlist - call playlist API
-          response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
-          data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || ERROR_MESSAGES.FETCH_FAILED);
-          }
-        } else {
-          throw new Error('Invalid YouTube URL format');
-        }
       } else {
-        // For other platforms, use original logic
-        response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
-        data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || ERROR_MESSAGES.FETCH_FAILED);
-        }
+        throw new Error('Only SoundCloud URLs are supported by this hook');
       }
 
       if (!data.tracks || data.tracks.length === 0) {

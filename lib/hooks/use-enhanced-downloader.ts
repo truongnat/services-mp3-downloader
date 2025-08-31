@@ -199,17 +199,6 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
               [track.id]: error instanceof Error ? error.message : 'Download failed',
             },
           }));
-          
-          // Continue with next track
-          completed++;
-          setDownloadState(prev => ({
-            ...prev,
-            overallProgress: {
-              completed,
-              total: tracks.length,
-              percent: Math.round((completed / tracks.length) * 100),
-            },
-          }));
         }
       }
 
@@ -224,7 +213,7 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
         isDownloading: false,
         errors: {
           ...prev.errors,
-          playlist: error instanceof Error ? error.message : 'Playlist download failed',
+          general: error instanceof Error ? error.message : 'Playlist download failed',
         },
       }));
     } finally {
@@ -244,10 +233,6 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
   }, [abortController]);
 
   const resetDownloadState = useCallback(() => {
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-    }
     setDownloadState({
       isDownloading: false,
       currentTrackIndex: -1,
@@ -259,7 +244,7 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
       },
       errors: {},
     });
-  }, [abortController]);
+  }, []);
 
   return {
     downloadState,

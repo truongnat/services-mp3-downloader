@@ -8,6 +8,15 @@ if (!SOUNDCLOUD_CLIENT_ID) {
   throw new Error('SOUNDCLOUD_CLIENT_ID environment variable is required');
 }
 
+// Interface for SoundCloud transcoding
+interface SoundCloudTranscoding {
+  url: string;
+  format: {
+    protocol: string;
+    mime_type?: string;
+  };
+}
+
 interface SoundCloudPlaylistApi {
   tracks: SoundcloudTrack[];
 }
@@ -224,7 +233,7 @@ async function handlePlaylist(
       let streamUrl: string | null = null;
       try {
         if (track.media && Array.isArray(track.media.transcodings)) {
-          const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
+          const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
           if (progressive) {
             const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
             const res = await fetch(url);
@@ -402,7 +411,7 @@ export async function searchTracks(
     });
 
     // Handle different response structures
-    let searchResults: any[];
+    let searchResults: SoundcloudTrack[];
     if (Array.isArray(searchResponse)) {
       searchResults = searchResponse;
     } else if (searchResponse && Array.isArray((searchResponse as any).collection)) {
@@ -433,7 +442,7 @@ export async function searchTracks(
         let streamUrl: string | null = null;
         try {
           if (track.media && Array.isArray(track.media.transcodings)) {
-            const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
+            const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
             if (progressive) {
               const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
               const res = await fetch(url);

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { SoundCloudIcon, YouTubeIcon, SettingsIcon } from "@/components/icons";
 import { SettingsDialog } from "@/components/settings-dialog";
 import PlaylistDownloaderSoundCloud from "./PlaylistDownloaderSoundCloud";
-import PlaylistDownloaderYouTube from "./PlaylistDownloaderYouTube";
+import YouTubeYtdlDownloader from "./YouTubeYtdlDownloader";
 
 export default function Home() {
   const [disableTabs, setDisableTabs] = useState(false);
@@ -64,10 +64,10 @@ export default function Home() {
           <TabsContent value="youtube" className="mt-4 sm:mt-6">
             <Card className="pt-0">
               <CardContent className="py-0 px-4 sm:px-6">
-                <PlaylistDownloaderYouTube setDisableTabs={setDisableTabs} />
+                <YouTubeYtdlDownloader />
               </CardContent>
               <CardFooter className="text-xs sm:text-sm text-muted-foreground px-4 sm:px-6">
-                Supported format: YouTube audio and playlist URLs
+                YouTube downloader using @distube/ytdl-core + ffmpeg
               </CardFooter>
             </Card>
           </TabsContent>

@@ -38,12 +38,12 @@ A modern, full-featured web application built with Next.js that allows users to 
 - ✅ Automatic metadata extraction
 
 ### 📺 **YouTube**
-- ✅ Public playlists (unlimited videos)
-- ✅ Individual videos
+- ✅ Individual videos (using @distube/ytdl-core + ffmpeg)
 - ✅ Short URLs (`youtu.be`)
-- ✅ Standard URLs with playlist parameters
-- ✅ Multiple video formats support
-- ✅ Channel and video metadata extraction
+- ✅ Radio/mix playlist URLs (auto-cleaned to extract video ID)
+- ✅ Multiple audio formats (MP3, M4A)
+- ✅ Quality selection (highest/lowest audio)
+- ✅ Real-time download progress
 
 ## 🛠️ Tech Stack
 
@@ -292,21 +292,22 @@ pnpm build
 │   ├── api/                               # API routes
 │   │   ├── soundcloud/                    # SoundCloud APIs
 │   │   │   ├── playlist/route.ts          # Playlist endpoint
+│   │   │   ├── search/route.ts            # Search endpoint
 │   │   │   └── track/route.ts             # Track endpoint
 │   │   └── youtube/                       # YouTube APIs
 │   │       ├── playlist/route.ts          # Playlist endpoint
 │   │       ├── video/route.ts             # Video endpoint
-│   │       └── download/route.ts          # Download proxy
+│   │       ├── ytdl-download/route.ts     # ytdl-core download endpoint
+│   │       └── ytdl-info/route.ts         # ytdl-core info endpoint
 │   ├── PlaylistDownloaderSoundCloud.tsx   # SoundCloud component
 │   ├── PlaylistDownloaderYouTube.tsx      # YouTube component
+│   ├── PlaylistTrackCard.tsx              # Track card component
+│   ├── YouTubeYtdlDownloader.tsx          # YouTube ytdl-core component
 │   └── page.tsx                           # Main application page
 ├── components/                            # Reusable UI components
 │   ├── playlist/                          # Playlist-specific components
-│   │   ├── playlist-downloader.tsx        # Generic downloader
-│   │   ├── playlist-input.tsx             # URL input with clear button
 │   │   ├── playlist-header.tsx            # Playlist info display
-│   │   ├── track-list.tsx                 # Track listing with progress
-│   │   └── macos-tip.tsx                  # macOS download tip
+│   │   └── track-list.tsx                 # Track listing with progress
 │   ├── settings-dialog.tsx                # Settings configuration
 │   ├── icons.tsx                          # Custom icon components
 │   └── ui/                                # Shadcn/ui base components
@@ -314,20 +315,20 @@ pnpm build
 │   ├── soundcloud/                        # SoundCloud integration
 │   │   └── soundcloud.ts                  # API client and utilities
 │   ├── youtube/                           # YouTube integration
-│   │   ├── youtube.ts                     # API client and utilities
-│   │   ├── config.ts                      # Configuration
-│   │   └── cookie-manager.ts              # Session management
+│   │   ├── youtube.ts                     # Legacy compatibility layer
+│   │   └── ytdl-downloader.ts             # ytdl-core implementation
 │   ├── hooks/                             # Custom React hooks
-│   │   └── use-playlist-downloader.ts     # Playlist state management
-│   ├── download-utils.ts                  # Download utilities
-│   ├── platform-downloads.ts             # Platform-specific downloads
-│   ├── type-adapters.ts                   # Data transformation
+│   │   ├── use-enhanced-downloader.ts     # Enhanced download management
+│   │   ├── use-playlist-downloader.ts     # Playlist state management
+│   │   ├── use-settings.ts                # Settings management
+│   │   └── use-youtube-ytdl-downloader.ts # YouTube ytdl-core hook
+│   ├── settings.ts                        # Settings configuration
 │   ├── url-validator.ts                   # URL validation and detection
-│   └── settings.ts                        # Settings management
+│   └── utils.ts                           # Common utilities
 ├── types/                                 # TypeScript type definitions
 │   ├── soundcloud.ts                      # SoundCloud types
 │   ├── youtube.ts                         # YouTube types
-│   └── common.ts                          # Shared types
+│   └── common.ts                          # Shared types and utilities
 └── public/                                # Static assets
     └── favicon.ico                        # Application icon
 ```

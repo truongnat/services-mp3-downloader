@@ -1,60 +1,39 @@
-import { CommonTrackInfo } from "@/lib/download-utils";
-import { YouTubeTrackInfo } from "@/types/youtube";
+// Type adapters to convert platform-specific types to common types
+import { CommonTrackInfo } from "@/types/common";
 import { SoundCloudTrackInfo } from "@/types/soundcloud";
 
-// Convert YouTube track to common format
-export function youtubeToCommon(track: YouTubeTrackInfo): CommonTrackInfo {
-  return {
-    id: track.id,
-    title: track.title,
-    artist: track.artist,
-    duration: track.duration,
-    artwork: track.artwork,
-    url: track.url,
-    streamUrl: track.streamUrl || '',
-    format: track.format,
-    size: typeof track.size === 'string' ? parseInt(track.size) : undefined,
-    bitrate: typeof track.bitrate === 'string' ? parseInt(track.bitrate) : undefined
-  };
-}
-
-// Convert SoundCloud track to common format
+/**
+ * Convert SoundCloud track info to common track info
+ */
 export function soundcloudToCommon(track: SoundCloudTrackInfo): CommonTrackInfo {
   return {
     id: track.id,
     title: track.title,
     artist: track.artist,
-    duration: track.duration,
+    duration: Math.floor(track.duration / 1000), // Convert ms to seconds for consistency
     artwork: track.artwork,
     url: track.url,
-    streamUrl: track.streamUrl || '',
+    streamUrl: track.streamUrl,
+    size: track.size,
+    bitrate: track.bitrate,
     format: track.format,
-    size: typeof track.size === 'string' ? parseInt(track.size) : undefined,
-    bitrate: typeof track.bitrate === 'string' ? parseInt(track.bitrate) : undefined
   };
 }
 
-// Convert array of YouTube tracks
-export function youtubeTracksToCommon(tracks: YouTubeTrackInfo[]): CommonTrackInfo[] {
-  return tracks.map(youtubeToCommon);
-}
-
-// Convert array of SoundCloud tracks
-export function soundcloudTracksToCommon(tracks: SoundCloudTrackInfo[]): CommonTrackInfo[] {
-  return tracks.map(soundcloudToCommon);
-}
-
-// Generic converter function
-export function tracksToCommon<T extends YouTubeTrackInfo | SoundCloudTrackInfo>(
-  tracks: T[],
-  platform: 'youtube' | 'soundcloud'
-): CommonTrackInfo[] {
-  switch (platform) {
-    case 'youtube':
-      return youtubeTracksToCommon(tracks as YouTubeTrackInfo[]);
-    case 'soundcloud':
-      return soundcloudTracksToCommon(tracks as SoundCloudTrackInfo[]);
-    default:
-      throw new Error(`Unsupported platform: ${platform}`);
-  }
+/**
+ * Convert common track info to SoundCloud track info
+ */
+export function commonToSoundcloud(track: CommonTrackInfo): SoundCloudTrackInfo {
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    duration: track.duration * 1000, // Convert seconds to ms
+    artwork: track.artwork,
+    url: track.url,
+    streamUrl: track.streamUrl,
+    size: track.size,
+    bitrate: track.bitrate,
+    format: track.format,
+  };
 }

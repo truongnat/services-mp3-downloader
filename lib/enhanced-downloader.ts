@@ -1,329 +1,212 @@
-// Browser-compatible enhanced downloader
-// Uses API endpoints instead of direct Node.js library imports
-
-import { AudioSettings } from '@/lib/settings';
-import { CommonTrackInfo } from '@/lib/download-utils';
-
-const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || "59BqQCyB9AWNYAglJEiHbp1h6keJHfrU";
+// Enhanced downloader with improved functionality
+import { AudioSettings } from "@/lib/settings";
 
 export interface DownloadProgress {
   percent: number;
   downloaded: number;
   total: number;
   speed?: number;
-  eta?: number;
-}
-
-export interface DownloadOptions {
-  url: string;
-  platform: 'youtube' | 'soundcloud';
-  format?: 'mp3' | 'm4a' | 'opus';
-  quality?: 'highest' | 'high' | 'medium' | 'low';
-  bitrate?: string;
-  onProgress?: (progress: DownloadProgress) => void;
-  abortSignal?: AbortSignal;
 }
 
 export interface TrackMetadata {
   title: string;
   artist: string;
-  duration: number;
-  thumbnail?: string;
-  id: string;
+  album?: string;
+  year?: number;
+  duration?: number;
+  artwork?: string;
+}
+
+export interface DownloadOptions {
+  url: string;
+  platform: 'youtube' | 'soundcloud';
+  format?: 'mp3' | 'm4a' | 'opus' | 'webm';
+  quality?: 'high' | 'medium' | 'low';
+  bitrate?: string;
+  onProgress?: (progress: DownloadProgress) => void;
+  abortSignal?: AbortSignal;
+}
+
+export interface DownloadResult {
+  blob: Blob;
+  metadata: TrackMetadata;
 }
 
 export class EnhancedDownloader {
   /**
-   * Download and convert audio from YouTube or SoundCloud
-   * Browser-only version without ffmpeg processing
+   * Download a track with enhanced features
    */
-  static async downloadTrack(options: DownloadOptions): Promise<{ blob: Blob; metadata: TrackMetadata }> {
-    const { url, platform, format = 'mp3', quality = 'high', onProgress, abortSignal } = options;
+  static async downloadTrack(options: DownloadOptions): Promise<DownloadResult> {
+    const { url, platform, format = 'mp3', quality = 'medium', onProgress, abortSignal } = options;
 
-    if (platform === 'youtube') {
-      return await this.downloadYouTubeTrack(url, format, quality, onProgress, abortSignal);
-    } else if (platform === 'soundcloud') {
-      return await this.downloadSoundCloudTrack(url, format, quality, onProgress, abortSignal);
-    } else {
-      throw new Error(`Unsupported platform: ${platform}`);
-    }
-  }
-
-  /**
-   * Download YouTube track with ytdl-core (browser version)
-   */
-  private static async downloadYouTubeTrack(
-    url: string,
-    format: string,
-    quality: string,
-    onProgress?: (progress: DownloadProgress) => void,
-    abortSignal?: AbortSignal
-  ): Promise<{ blob: Blob; metadata: TrackMetadata }> {
     try {
-      // Extract video ID
-      const videoId = this.extractYouTubeVideoId(url);
-      if (!videoId) {
-        throw new Error('Invalid YouTube URL');
-      }
+      let downloadUrl: string;
+      let metadata: TrackMetadata;
 
-      // Get basic track information first
-      const trackResponse = await fetch(`/api/youtube/track?url=${encodeURIComponent(url)}`, {
-        signal: abortSignal
-      });
-      
-      if (!trackResponse.ok) {
-        if (trackResponse.status === 400) {
-          throw new Error('Invalid YouTube URL format');
-        } else if (trackResponse.status === 404) {
-          throw new Error('Video not found or unavailable');
-        } else if (trackResponse.status >= 500) {
-          throw new Error('Server error - please try again later');
-        } else {
-          throw new Error('Failed to get track information');
-        }
-      }
-      
-      const trackData = await trackResponse.json();
-      const trackInfo = trackData.track;
-      
-      const metadata: TrackMetadata = {
-        id: trackInfo.id,
-        title: trackInfo.title,
-        artist: trackInfo.artist,
-        duration: trackInfo.duration,
-        thumbnail: trackInfo.artwork,
-      };
-
-      // Download directly through the enhanced download endpoint
-      // This endpoint will generate fresh stream URLs and download immediately
-      const audioBlob = await this.downloadStreamWithProgress(
-        `/api/youtube/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(metadata.title + '.mp3')}&quality=${quality}&format=${format}`, 
-        onProgress, 
-        abortSignal
-      );
-
-      return { blob: audioBlob, metadata };
-    } catch (error) {
-      // Handle different types of errors
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Network error - please check your internet connection and try again');
-      } else if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Download was cancelled');
-      } else if (error instanceof Error) {
-        // Re-throw our custom error messages
-        throw error;
-      } else {
-        throw new Error(`YouTube download failed: Unknown error`);
-      }
-    }
-  }
-
-  /**
-   * Download SoundCloud track
-   */
-  private static async downloadSoundCloudTrack(
-    url: string,
-    format: string,
-    quality: string,
-    onProgress?: (progress: DownloadProgress) => void,
-    abortSignal?: AbortSignal
-  ): Promise<{ blob: Blob; metadata: TrackMetadata }> {
-    try {
-      // For browser environment, we'll fetch stream URL via API
-      const response = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url)}`, {
-        signal: abortSignal
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get track information');
-      }
-      
-      const data = await response.json();
-      const trackInfo = data.track;
-      
-      const metadata: TrackMetadata = {
-        id: trackInfo.id,
-        title: trackInfo.title,
-        artist: trackInfo.artist,
-        duration: trackInfo.duration,
-        thumbnail: trackInfo.artwork,
-      };
-
-      // Download the audio stream
-      const audioBlob = await this.downloadStreamWithProgress(
-        trackInfo.streamUrl, 
-        onProgress, 
-        abortSignal
-      );
-
-      return { blob: audioBlob, metadata };
-    } catch (error) {
-      throw new Error(`SoundCloud download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Download stream with progress tracking (browser version)
-   */
-  private static async downloadStreamWithProgress(
-    streamUrl: string,
-    onProgress?: (progress: DownloadProgress) => void,
-    abortSignal?: AbortSignal
-  ): Promise<Blob> {
-    if (!streamUrl) {
-      throw new Error('No stream URL available');
-    }
-
-    const response = await fetch(streamUrl, {
-      signal: abortSignal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'audio/*,*/*;q=0.9',
-      },
-    });
-
-    if (!response.ok || !response.body) {
-      // Handle API error responses (JSON) vs stream responses
-      const contentType = response.headers.get('Content-Type');
-      
-      if (contentType?.includes('application/json')) {
-        const errorData = await response.json();
-        
-        // Handle specific YouTube error codes
-        if (errorData.code === 'youtube_blocked') {
-          throw new Error(errorData.error + ' YouTube downloads have approximately 30-50% success rate due to their restrictions.');
-        } else if (errorData.code === 'rate_limited') {
-          throw new Error('Too many requests - please wait a few minutes before trying again.');
-        } else if (errorData.retryable) {
-          throw new Error(errorData.error + ' You can try downloading this track again.');
-        } else {
-          throw new Error(errorData.error || `Server error: ${response.status}`);
-        }
-      }
-      
-      // Provide more specific error messages for stream responses
-      if (response.status === 403) {
-        throw new Error('Access denied - this content may be restricted or require authentication');
-      } else if (response.status === 404) {
-        throw new Error('Audio stream not found - the video may have been removed');
-      } else if (response.status >= 500) {
-        throw new Error('YouTube server error - please try again later');
-      } else {
-        throw new Error(`Failed to fetch audio stream (${response.status})`);
-      }
-    }
-
-    const contentLength = response.headers.get('Content-Length');
-    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-    
-    // Read the stream with progress tracking
-    const reader = response.body.getReader();
-    let downloadedBytes = 0;
-    const chunks: Uint8Array[] = [];
-    const startTime = Date.now();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-      
-      chunks.push(value);
-      downloadedBytes += value.length;
-
-      // Calculate progress and speed
-      if (onProgress && totalBytes > 0) {
-        const percent = Math.round((downloadedBytes / totalBytes) * 100);
-        const elapsed = (Date.now() - startTime) / 1000; // seconds
-        const speed = downloadedBytes / elapsed; // bytes per second
-        const remaining = totalBytes - downloadedBytes;
-        const eta = speed > 0 ? remaining / speed : 0; // seconds
-
-        onProgress({
-          percent,
-          downloaded: downloadedBytes,
-          total: totalBytes,
-          speed,
-          eta,
+      if (platform === 'youtube') {
+        // For YouTube, use the ytdl-download API
+        const params = new URLSearchParams({
+          url,
+          format: format === 'opus' ? 'm4a' : format,
+          quality: quality === 'high' ? 'highestaudio' : 'lowestaudio'
         });
+
+        downloadUrl = `/api/youtube/ytdl-download?${params.toString()}`;
+
+        // Get metadata first
+        const infoResponse = await fetch(`/api/youtube/ytdl-info?url=${encodeURIComponent(url)}`);
+        const infoData = await infoResponse.json();
+        
+        if (!infoResponse.ok) {
+          throw new Error(infoData.error || 'Failed to get video info');
+        }
+
+        metadata = {
+          title: infoData.data.title || 'Unknown',
+          artist: infoData.data.artist || 'Unknown',
+          duration: infoData.data.duration || 0,
+          artwork: infoData.data.artwork,
+        };
+      } else if (platform === 'soundcloud') {
+        // For SoundCloud, get track info first then download
+        const trackResponse = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url)}`);
+        const trackData = await trackResponse.json();
+        
+        if (!trackResponse.ok) {
+          throw new Error(trackData.error || 'Failed to get track info');
+        }
+
+        const track = trackData.track;
+        downloadUrl = track.streamUrl;
+        
+        if (!downloadUrl) {
+          throw new Error('No stream URL available for this track');
+        }
+
+        metadata = {
+          title: track.title || 'Unknown',
+          artist: track.artist || 'Unknown',
+          duration: track.duration ? Math.floor(track.duration / 1000) : 0,
+          artwork: track.artwork,
+        };
+      } else {
+        throw new Error(`Unsupported platform: ${platform}`);
       }
+
+      // Download the file
+      const response = await fetch(downloadUrl, {
+        signal: abortSignal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText}`);
+      }
+
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let downloaded = 0;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          if (abortSignal?.aborted) {
+            throw new Error('Download cancelled');
+          }
+
+          chunks.push(value);
+          downloaded += value.length;
+
+          if (onProgress && total > 0) {
+            onProgress({
+              percent: Math.round((downloaded / total) * 100),
+              downloaded,
+              total,
+            });
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Combine chunks into blob
+      const blob = new Blob(chunks, { 
+        type: format === 'mp3' ? 'audio/mpeg' : 'audio/mp4' 
+      });
+
+      return { blob, metadata };
+
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Download cancelled');
+      }
+      throw error;
     }
-
-    return new Blob(chunks, { type: 'audio/mpeg' });
   }
 
   /**
-   * Extract YouTube video ID from URL
-   */
-  private static extractYouTubeVideoId(url: string): string | null {
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
-      /(?:youtu\.be\/)([^&\n?#]+)/,
-      /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
-      /(?:youtube\.com\/shorts\/)([^&\n?#]+)/,
-      /^([a-zA-Z0-9_-]{11})$/
-    ];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-    return null;
-  }
-
-  /**
-   * Save blob as file
-   */
-  static saveFile(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-  }
-
-  /**
-   * Generate filename from metadata with settings support
+   * Generate a filename based on metadata and settings
    */
   static generateFilename(
     metadata: TrackMetadata, 
     format: string, 
     settings: AudioSettings,
-    index?: number
+    trackIndex?: number
   ): string {
-    let filename = settings.filenameFormat;
+    let filename: string;
 
-    // Replace variables with proper formatting
-    if (index !== undefined) {
-      filename = filename.replace('{index:03d}', String(index + 1).padStart(3, '0'));
-      filename = filename.replace('{index}', String(index + 1).padStart(2, '0'));
-    }
-    filename = filename.replace('{artist}', metadata.artist || 'Unknown Artist');
-    filename = filename.replace('{title}', metadata.title || 'Unknown Title');
-    filename = filename.replace('{album}', 'Unknown Album'); // Most platforms don't have album info
-
-    // Apply settings
-    if (!settings.includeIndex) {
-      filename = filename.replace(/^\[?\d+\]?\s*[.-]?\s*/, ''); // Remove leading number with various formats
-      filename = filename.replace(/\(\d+\)$/, ''); // Remove trailing number in parentheses
-    }
-    if (!settings.includeArtist) {
-      filename = filename.replace(/.*?\s*-\s*/, ''); // Remove artist part
-    }
-
-    // Sanitize filename if enabled
+    // Use song title as filename (following project specification)
     if (settings.sanitizeFilename) {
-      filename = filename.replace(/[<>:"/\\|?*]/g, '').replace(/[.]{2,}/g, '.').replace(/\s+/g, '_');
+      // Remove special characters for compatibility
+      filename = metadata.title
+        .replace(/[^\w\s-]/g, '') // Remove special chars except spaces and hyphens
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+    } else {
+      filename = metadata.title;
     }
 
-    return filename + '.' + format;
+    // Add track number if it's part of a playlist
+    if (trackIndex !== undefined && trackIndex >= 0) {
+      const paddedIndex = (trackIndex + 1).toString().padStart(2, '0');
+      filename = `${paddedIndex}. ${filename}`;
+    }
+
+    // Add file extension
+    filename += `.${format}`;
+
+    return filename;
+  }
+
+  /**
+   * Save file to user's device
+   */
+  static saveFile(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Check if the current browser supports file downloads
+   */
+  static isDownloadSupported(): boolean {
+    return typeof window !== 'undefined' && 
+           'URL' in window && 
+           'createObjectURL' in window.URL;
   }
 }

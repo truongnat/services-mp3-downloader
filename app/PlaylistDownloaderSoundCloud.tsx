@@ -2,7 +2,7 @@
 import { useCallback, useState } from "react";
 import { usePlaylistDownloader } from "@/lib/hooks/use-playlist-downloader";
 import { useEnhancedDownloader, TrackDownloadInfo } from "@/lib/hooks/use-enhanced-downloader";
-import { CommonTrackInfo } from "@/lib/download-utils";
+import { CommonTrackInfo } from "@/types/common";
 
 // Components
 import PlaylistHeader from "@/components/playlist/playlist-header";

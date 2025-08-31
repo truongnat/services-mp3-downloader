@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import PlaylistTrackCard from "@/app/PlaylistTrackCard";
-import { CommonTrackInfo, formatDuration, formatFileSize, formatBitrate } from "@/lib/download-utils";
+import { CommonTrackInfo, formatDuration, formatFileSize, formatBitrate } from "@/types/common";
 import { TrackDownloadStatus } from "@/lib/hooks/use-playlist-downloader";
 
 interface TrackListProps<T extends CommonTrackInfo> {
