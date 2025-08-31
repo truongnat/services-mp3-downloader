@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { downloadYouTubeAudio, getYouTubeVideoInfo, convertToMp3 } from "@/lib/youtube/ytdl-downloader";
+import { 
+  downloadYouTubeAudio, 
+  getYouTubeVideoInfo, 
+  convertToMp3,
+  convertToMp3WithSmartFallback 
+} from "@/lib/youtube/ytdl-downloader";
 
 export const runtime = "nodejs";
 
@@ -16,6 +21,8 @@ export async function GET(req: NextRequest) {
   const rawFilename = req.nextUrl.searchParams.get("filename");
   const format = req.nextUrl.searchParams.get("format") || "mp3";
   const quality = req.nextUrl.searchParams.get("quality") || "highestaudio";
+  const skipConversion = req.nextUrl.searchParams.get("skipConversion") === "true";
+  const timeout = parseInt(req.nextUrl.searchParams.get("timeout") || "30000");
 
   if (!videoUrl) {
     return NextResponse.json({ error: "Missing video URL" }, { status: 400 });
@@ -27,11 +34,6 @@ export async function GET(req: NextRequest) {
     // Get video info first
     const videoInfo = await getYouTubeVideoInfo(videoUrl);
     
-    // Generate filename
-    const filename = rawFilename 
-      ? sanitizeFilename(rawFilename)
-      : sanitizeFilename(`${videoInfo.title}.${format}`);
-
     console.log(`[YouTube ytdl-core] Video info: ${videoInfo.title} by ${videoInfo.artist}`);
 
     // Download audio stream
@@ -51,19 +53,47 @@ export async function GET(req: NextRequest) {
 
     console.log(`[YouTube ytdl-core] Audio stream obtained, processing...`);
 
-    // Convert to MP3 if needed
+    // Convert to MP3 if needed with smart fallback
     let audioStream = downloadResult.stream;
+    let actualFormat = format;
+    
     if (format === 'mp3') {
-      audioStream = convertToMp3(downloadResult.stream);
+      console.log(`🎵 Converting to MP3 with smart fallback...`);
+      
+      if (skipConversion) {
+        console.log('⚠️ MP3 conversion skipped by request');
+        actualFormat = 'm4a'; // Likely the original format
+      } else {
+        const conversionResult = await convertToMp3WithSmartFallback(downloadResult.stream, {
+          maxRetries: 2,
+          retryTimeout: timeout
+        });
+        
+        audioStream = conversionResult.stream;
+        if (!conversionResult.converted) {
+          console.warn('⚠️ MP3 conversion failed, serving original format');
+          actualFormat = 'm4a'; // Fallback format
+        }
+      }
     }
+    
+    // Generate filename with actual format
+    const baseFilename = rawFilename 
+      ? sanitizeFilename(rawFilename.replace(/\.[^/.]+$/, "")) // Remove extension if present
+      : sanitizeFilename(videoInfo.title);
+    
+    const filename = `${baseFilename}.${actualFormat}`;
 
-    // Set response headers
+    // Set response headers with correct content type
     const headers = new Headers();
-    headers.set('Content-Type', format === 'mp3' ? 'audio/mpeg' : 'audio/mp4');
+    headers.set('Content-Type', actualFormat === 'mp3' ? 'audio/mpeg' : 'audio/mp4');
     headers.set('Content-Disposition', `attachment; filename="${filename}"`);
     headers.set('Transfer-Encoding', 'chunked');
+    
+    // Add custom header to indicate if conversion was successful
+    headers.set('X-Conversion-Status', actualFormat === format ? 'success' : 'fallback');
 
-    console.log(`[YouTube ytdl-core] Streaming ${filename}`);
+    console.log(`[YouTube ytdl-core] Streaming ${filename} (format: ${actualFormat})`);
 
     // Stream the response
     return new NextResponse(audioStream as any, {

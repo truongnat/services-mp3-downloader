@@ -68,7 +68,8 @@ export class EnhancedDownloader {
           artwork: infoData.data.artwork,
         };
       } else if (platform === 'soundcloud') {
-        // For SoundCloud, get track info first then download
+        // For SoundCloud, use the download proxy endpoint  
+        // Get metadata first
         const trackResponse = await fetch(`/api/soundcloud/track?url=${encodeURIComponent(url)}`);
         const trackData = await trackResponse.json();
         
@@ -77,26 +78,34 @@ export class EnhancedDownloader {
         }
 
         const track = trackData.track;
-        downloadUrl = track.streamUrl;
         
-        if (!downloadUrl) {
-          throw new Error('No stream URL available for this track');
-        }
-
         metadata = {
           title: track.title || 'Unknown',
           artist: track.artist || 'Unknown',
           duration: track.duration ? Math.floor(track.duration / 1000) : 0,
           artwork: track.artwork,
         };
+        
+        const params = new URLSearchParams({
+          url,
+          filename: `${metadata.title}.${format}`,
+        });
+        
+        downloadUrl = `/api/soundcloud/download?${params.toString()}`;
+        
+        console.log('SoundCloud download URL:', downloadUrl);
       } else {
         throw new Error(`Unsupported platform: ${platform}`);
       }
 
       // Download the file
+      console.log('Starting download from URL:', downloadUrl);
       const response = await fetch(downloadUrl, {
         signal: abortSignal,
       });
+
+      console.log('Download response status:', response.status);
+      console.log('Download response headers:', response.headers);
 
       if (!response.ok) {
         throw new Error(`Download failed: ${response.statusText}`);
@@ -191,14 +200,27 @@ export class EnhancedDownloader {
    * Save file to user's device
    */
   static saveFile(blob: Blob, filename: string): void {
+    console.log('Saving file:', filename, 'Blob size:', blob.size, 'bytes');
+    
+    if (!EnhancedDownloader.isDownloadSupported()) {
+      console.error('Downloads not supported in this browser');
+      throw new Error('Downloads not supported in this browser');
+    }
+    
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    
+    // Ensure the link is added to DOM for download to work
     document.body.appendChild(link);
+    console.log('Triggering download...');
     link.click();
+    
+    // Clean up
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+    console.log('Download triggered successfully');
   }
 
   /**

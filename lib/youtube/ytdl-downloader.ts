@@ -1,13 +1,18 @@
 import ytdl from "@distube/ytdl-core";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegPath from "ffmpeg-static";
 import { Readable } from "stream";
-import { YouTubeTrackInfo } from "@/types/youtube";
-
-// Set ffmpeg path
-if (ffmpegPath) {
-  ffmpeg.setFfmpegPath(ffmpegPath);
-}
+import { YouTubeTrackInfo, YouTubePlaylistInfo, YouTubePlaylistApiResponse } from "@/types/youtube";
+import { 
+  convertToMp3 as ffmpegConvertToMp3, 
+  convertToMp3WithFallback,
+  isFFmpegAvailable 
+} from "@/lib/ffmpeg-utils";
+import {
+  extractVideoId,
+  extractPlaylistId,
+  cleanRadioMixUrl,
+  isPlaylistUrl,
+  isVideoUrl
+} from "@/lib/youtube/url-utils";
 
 export interface YouTubeDownloadOptions {
   url: string;
@@ -24,74 +29,6 @@ export interface YouTubeDownloadResult {
   author?: string;
   stream?: Readable;
   error?: string;
-}
-
-/**
- * Extract video ID from YouTube URL
- */
-export function extractVideoId(url: string): string | null {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
-    /(?:youtu\.be\/)([^&\n?#]+)/,
-    /(?:youtube\.com\/embed\/)([^&\n?#]+)/,
-    /(?:youtube\.com\/shorts\/)([^&\n?#]+)/,
-    /^([a-zA-Z0-9_-]{11})$/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-/**
- * Extract playlist ID from YouTube URL
- */
-export function extractPlaylistId(url: string): string | null {
-  const patterns = [
-    /[?&]list=([^&\n?#]+)/,
-    /^(PL[a-zA-Z0-9_-]+)$/,
-    /^(UU[a-zA-Z0-9_-]+)$/,
-    /^(FL[a-zA-Z0-9_-]+)$/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-/**
- * Check if URL contains a radio/mix playlist and clean it
- */
-export function cleanRadioMixUrl(url: string): {
-  isRadioMix: boolean;
-  cleanUrl: string;
-  videoId?: string;
-} {
-  const playlistMatch = url.match(/[?&]list=([^&\n?#]+)/);
-
-  if (playlistMatch) {
-    const playlistId = playlistMatch[1];
-    if (playlistId.startsWith("RD")) {
-      // Extract video ID from radio/mix URL
-      const videoIdMatch = url.match(/[?&]v=([^&\n?#]+)/);
-      if (videoIdMatch) {
-        return {
-          isRadioMix: true,
-          cleanUrl: `https://www.youtube.com/watch?v=${videoIdMatch[1]}`,
-          videoId: videoIdMatch[1],
-        };
-      }
-    }
-  }
-
-  return {
-    isRadioMix: false,
-    cleanUrl: url,
-  };
 }
 
 /**
@@ -214,34 +151,100 @@ export async function downloadYouTubeAudio(
 /**
  * Convert audio stream to MP3 using ffmpeg
  */
-export function convertToMp3(inputStream: Readable): Readable {
-  return ffmpeg(inputStream)
-    .audioCodec("libmp3lame")
-    .audioBitrate(128)
-    .audioChannels(2)
-    .audioFrequency(44100)
-    .format("mp3")
-    .on("start", (commandLine) => {
-      console.log("FFmpeg process started:", commandLine);
-    })
-    .on("error", (err) => {
-      console.error("FFmpeg error:", err);
-    })
-    .pipe() as Readable;
+export async function convertToMp3(
+  inputStream: Readable, 
+  options: { 
+    skipConversion?: boolean;
+    timeout?: number;
+  } = {}
+): Promise<Readable> {
+  const { skipConversion = false, timeout = 30000 } = options;
+  
+  // Skip conversion if requested
+  if (skipConversion) {
+    console.log('⚠️ Skipping FFmpeg conversion as requested');
+    return inputStream;
+  }
+  
+  try {
+    return await ffmpegConvertToMp3(inputStream, {
+      bitrate: 128,
+      channels: 2,
+      frequency: 44100,
+      timeout
+    });
+  } catch (error) {
+    console.error('Failed to convert audio to MP3:', error);
+    // Return original stream as fallback
+    return inputStream;
+  }
 }
 
 /**
- * Helper to check if URL is a video or playlist
+ * Convert audio stream to MP3 using ffmpeg with smart fallback
  */
-export function isPlaylistUrl(url: string): boolean {
-  const playlistId = extractPlaylistId(url);
-  const videoId = extractVideoId(url);
-
-  // If has playlist ID but no video ID, it's a playlist
-  // If has both, treat as single video (common in YouTube Music)
-  return !!playlistId && !videoId;
+export async function convertToMp3WithSmartFallback(
+  inputStream: Readable,
+  options: {
+    maxRetries?: number;
+    retryTimeout?: number;
+  } = {}
+): Promise<{ stream: Readable; converted: boolean }> {
+  return await convertToMp3WithFallback(inputStream, {
+    bitrate: 128,
+    channels: 2,
+    frequency: 44100,
+    maxRetries: options.maxRetries || 2,
+    retryTimeout: options.retryTimeout || 15000
+  });
 }
 
-export function isVideoUrl(url: string): boolean {
-  return !!extractVideoId(url);
+/**
+ * Get YouTube playlist info using ytdl-core
+ * Note: This is a basic implementation since ytdl-core has limited playlist support
+ */
+export async function getYouTubePlaylistInfo(
+  playlistUrl: string
+): Promise<YouTubePlaylistApiResponse> {
+  try {
+    console.log(`[YouTube Playlist] Processing: ${playlistUrl}`);
+
+    // Extract playlist ID
+    const playlistId = extractPlaylistId(playlistUrl);
+    if (!playlistId) {
+      throw new Error("Invalid YouTube playlist URL");
+    }
+
+    // Check for radio/mix playlists
+    if (playlistId.startsWith("RD")) {
+      throw new Error("Radio/mix playlists are not supported. Please use individual video URLs instead.");
+    }
+
+    console.log(`[YouTube Playlist] Getting playlist info for ID: ${playlistId}`);
+
+    // For now, return a limited response since ytdl-core doesn't fully support playlists
+    // This is a placeholder implementation that users can enhance with external services
+    const playlistInfo: YouTubePlaylistInfo = {
+      id: playlistId,
+      title: "YouTube Playlist (Limited Support)",
+      description: "Due to ytdl-core limitations, full playlist enumeration is not available. Please download videos individually.",
+      artwork: "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+      tracksCount: 0,
+      author: "YouTube"
+    };
+
+    // Return empty tracks array with informational message
+    const tracks: YouTubeTrackInfo[] = [];
+
+    console.log(`[YouTube Playlist] Returning limited playlist info for ${playlistId}`);
+
+    return {
+      playlistInfo,
+      tracks
+    };
+
+  } catch (error) {
+    console.error("[YouTube Playlist] Error getting playlist info:", error);
+    throw error;
+  }
 }

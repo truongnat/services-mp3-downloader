@@ -1,6 +1,7 @@
 import { SoundCloudPlaylistApiResponse, SoundCloudPlaylistInfo, SoundCloudTrackInfo } from "@/types/soundcloud";
 import { Soundcloud } from "soundcloud.ts";
 import type { SoundcloudPlaylist, SoundcloudTrack } from "soundcloud.ts";
+import { getValidClientId } from "./client-id-manager";
 
 const SOUNDCLOUD_CLIENT_ID = process.env.SOUNDCLOUD_CLIENT_ID || "59BqQCyB9AWNYAglJEiHbp1h6keJHfrU";
 
@@ -25,6 +26,16 @@ interface SoundCloudPlaylistApi {
 const sc = new Soundcloud(SOUNDCLOUD_CLIENT_ID);
 
 console.log('SoundCloud client initialized with env client ID:', SOUNDCLOUD_CLIENT_ID.substring(0, 8) + '...');
+
+// Function to get dynamic client ID for API calls
+async function getDynamicClientId(): Promise<string> {
+  try {
+    return await getValidClientId();
+  } catch (error) {
+    console.warn('Failed to get dynamic client ID, using fallback:', error);
+    return SOUNDCLOUD_CLIENT_ID;
+  }
+}
 
 // Expand short URLs and clean up tracking parameters
 async function cleanUrl(url: string): Promise<string> {
@@ -132,8 +143,9 @@ export async function resolvePlaylist(
 ): Promise<SoundCloudPlaylistApiResponse> {
   try {
     const clean = await cleanUrl(url);
+    const clientId = await getDynamicClientId();
     console.log('Attempting to resolve SoundCloud URL:', clean);
-    console.log('Using client ID:', SOUNDCLOUD_CLIENT_ID.substring(0, 8) + '...');
+    console.log('Using client ID:', clientId.substring(0, 8) + '...');
 
     // First, try the generic resolve method which is more reliable
     try {
@@ -197,7 +209,7 @@ export async function resolvePlaylist(
     const errorDetails = {
       originalUrl: url,
       cleanedUrl: clean,
-      clientId: SOUNDCLOUD_CLIENT_ID ? 'Present' : 'Missing'
+      clientId: clientId ? 'Present' : 'Missing'
     };
     
     console.error('All resolution methods failed. Details:', errorDetails);
@@ -235,7 +247,8 @@ async function handlePlaylist(
         if (track.media && Array.isArray(track.media.transcodings)) {
           const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
           if (progressive) {
-            const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+            const clientId = await getDynamicClientId();
+            const url = `${progressive.url}?client_id=${clientId}`;
             const res = await fetch(url);
             if (res.ok) {
               const data = await res.json();
@@ -272,7 +285,8 @@ async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlay
       if (track.media && Array.isArray(track.media.transcodings)) {
         const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
         if (progressive) {
-          const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+          const clientId = await getDynamicClientId();
+          const url = `${progressive.url}?client_id=${clientId}`;
           const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
@@ -316,7 +330,8 @@ export async function downloadTrack(track: SoundcloudTrack): Promise<string | nu
   if (!track.media || !Array.isArray(track.media.transcodings)) return null;
   const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
   if (!progressive) return null;
-  const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+  const clientId = await getDynamicClientId();
+  const url = `${progressive.url}?client_id=${clientId}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
@@ -332,7 +347,8 @@ export async function downloadTrackWithProgress(track: SoundcloudTrack, onProgre
   if (!track.media || !Array.isArray(track.media.transcodings)) return;
   const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
   if (!progressive) return;
-  const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+  const clientId = await getDynamicClientId();
+  const url = `${progressive.url}?client_id=${clientId}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return;
@@ -444,7 +460,8 @@ export async function searchTracks(
           if (track.media && Array.isArray(track.media.transcodings)) {
             const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
             if (progressive) {
-              const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+              const clientId = await getDynamicClientId();
+              const url = `${progressive.url}?client_id=${clientId}`;
               const res = await fetch(url);
               if (res.ok) {
                 const data = await res.json();
@@ -493,7 +510,8 @@ export async function resolveTrack(url: string) {
       if (track.media && Array.isArray(track.media.transcodings)) {
         const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
         if (progressive) {
-          const url = `${progressive.url}?client_id=${SOUNDCLOUD_CLIENT_ID}`;
+          const clientId = await getDynamicClientId();
+          const url = `${progressive.url}?client_id=${clientId}`;
           const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
