@@ -3,12 +3,58 @@ import { resolveTrack } from "@/lib/soundcloud/soundcloud";
 
 export const runtime = "nodejs";
 
-// Helper function to sanitize filename
+// Helper function to sanitize filename for safe download
 function sanitizeFilename(filename: string): string {
   return filename
-    .replace(/[^\w\s.-]/g, '') // Remove special characters
-    .replace(/\s+/g, '_') // Replace spaces with underscores
-    .substring(0, 100); // Limit length
+    // First normalize Unicode characters
+    .normalize('NFD')
+    // Remove combining diacritical marks
+    .replace(/[\u0300-\u036f]/g, '')
+    // Replace non-ASCII characters with ASCII equivalents or remove them
+    .replace(/[^\x00-\x7F]/g, function(char) {
+      // Common Unicode to ASCII mappings
+      const charCode = char.charCodeAt(0);
+      if (charCode >= 0x0400 && charCode <= 0x04FF) {
+        // Cyrillic characters - transliterate common ones
+        const cyrillicMap: { [key: string]: string } = {
+          'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 
+          'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 
+          'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 
+          'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 
+          'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+          'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo',
+          'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+          'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+          'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Shch',
+          'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+        };
+        return cyrillicMap[char] || '';
+      }
+      // For other non-ASCII characters, remove them
+      return '';
+    })
+    // Remove invalid filename characters
+    .replace(/[<>:"/\\|?*]/g, '')
+    // Replace multiple spaces/underscores with single underscore
+    .replace(/[\s_]+/g, '_')
+    // Remove leading/trailing underscores and dots
+    .replace(/^[._]+|[._]+$/g, '')
+    // Limit length and ensure we don't end with a dot
+    .substring(0, 100)
+    .replace(/\.$/, '')
+    // Ensure we have at least some content
+    || 'audio';
+}
+
+// Helper function to create safe Content-Disposition header
+function createContentDispositionHeader(filename: string): string {
+  const sanitizedFilename = sanitizeFilename(filename);
+  
+  // Use RFC 5987 encoding for filename* parameter to support Unicode
+  const encodedFilename = encodeURIComponent(sanitizedFilename);
+  
+  // Use both filename and filename* for maximum compatibility
+  return `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -53,13 +99,13 @@ export async function GET(req: NextRequest) {
       }, { status: audioResponse.status });
     }
 
-    // Generate filename
-    const filename = rawFilename || sanitizeFilename(`${track.title}.mp3`);
-
+    // Generate filename - use only track title as per specification
+    const baseFilename = rawFilename || `${track.title}.mp3`;
+    
     // Set up response headers for file download
     const headers = new Headers();
     headers.set('Content-Type', 'audio/mpeg');
-    headers.set('Content-Disposition', `attachment; filename="${filename}"`);
+    headers.set('Content-Disposition', createContentDispositionHeader(baseFilename));
     headers.set('Cache-Control', 'no-cache');
     
     // Copy content length if available
@@ -68,7 +114,8 @@ export async function GET(req: NextRequest) {
       headers.set('Content-Length', contentLength);
     }
 
-    console.log(`[SoundCloud Download] Streaming audio file: ${filename}`);
+    const finalFilename = sanitizeFilename(baseFilename);
+    console.log(`[SoundCloud Download] Streaming audio file: ${finalFilename}`);
 
     // Stream the audio data directly to the client
     return new NextResponse(audioResponse.body, {
