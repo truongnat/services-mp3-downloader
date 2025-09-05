@@ -256,7 +256,7 @@ function extractVideoList(html: string): YouTubeTrackInfo[] {
     // Additional pattern for more comprehensive video extraction
     if (tracks.length === 0) {
       // Try to find video data in ytInitialData script
-      const ytInitialDataMatch = html.match(/var ytInitialData = (.*?);<\/script>/s);
+      const ytInitialDataMatch = html.match(/var ytInitialData = ([^;]*);/);
       if (ytInitialDataMatch) {
         try {
           const ytInitialData = JSON.parse(ytInitialDataMatch[1]);

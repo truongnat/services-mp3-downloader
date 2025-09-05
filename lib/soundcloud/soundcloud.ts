@@ -241,14 +241,14 @@ async function handlePlaylist(
       tracksRaw = await fetchAllTracksPaged(clean, playlistInfo.tracksCount, maxTracks);
     }
     // 4. Map tracks without prefetching stream URLs for performance
-    const tracks: SoundCloudTrackInfo[] = tracksRaw.map((track) => ({
+    const tracks: SoundCloudTrackInfo[] = tracksRaw?.map((track) => ({
       id: String(track.id),
       title: track.title,
       artist: track.user?.username || "",
       duration: track.duration,
       artwork: track.artwork_url || playlist.artwork_url || track.user?.avatar_url || "",
       url: track.permalink_url,
-      streamUrl: undefined,
+      streamUrl: null,
       size: undefined,
       bitrate: undefined,
       format: undefined,
@@ -429,7 +429,7 @@ export async function searchTracks(
       duration: track.duration,
       artwork: track.artwork_url || track.user?.avatar_url || "",
       url: track.permalink_url,
-      streamUrl: undefined,
+      streamUrl: null,
       size: undefined,
       bitrate: undefined,
       format: undefined,
