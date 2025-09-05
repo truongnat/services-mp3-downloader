@@ -12,6 +12,7 @@ A modern, full-featured web application built with Next.js that allows users to 
 - **Real-time Progress**: Live download progress tracking with speed indicators
 - **Smart URL Detection**: Automatically detects track vs playlist URLs
 - **Fallback Logic**: Try playlist first, fallback to track for ambiguous URLs
+- **Unified API Endpoints**: Single endpoint handles both videos and playlists
 
 ### 🎨 **User Experience**
 - **Modern UI**: Clean, responsive interface built with Tailwind CSS and Radix UI
@@ -39,11 +40,13 @@ A modern, full-featured web application built with Next.js that allows users to 
 
 ### 📺 **YouTube**
 - ✅ Individual videos (using @distube/ytdl-core + ffmpeg)
+- ✅ Playlists (using Google YouTube API with fallback to HTML parsing)
 - ✅ Short URLs (`youtu.be`)
 - ✅ Radio/mix playlist URLs (auto-cleaned to extract video ID)
 - ✅ Multiple audio formats (MP3, M4A)
 - ✅ Quality selection (highest/lowest audio)
 - ✅ Real-time download progress
+- ✅ Unified API handling for both videos and playlists
 
 ## 🛠️ Tech Stack
 
@@ -67,6 +70,7 @@ A modern, full-featured web application built with Next.js that allows users to 
 - **Type Adapters**: Platform-agnostic data transformation
 - **Generic Components**: Shared UI components across platforms
 - **Custom Hooks**: Reusable state logic for playlist management
+- **Unified API Endpoints**: Single endpoint for handling both videos and playlists
 
 ## 🚀 Getting Started
 
@@ -198,59 +202,54 @@ pnpm build
 #### **Additional Options**
 - **Include Artist**: Add artist name to filename
 - **Include Index**: Add track number prefix
-- **Sanitize Filename**: Remove invalid characters
 
-## 🔌 API Endpoints
+## 📡 API Endpoints
 
-### 🎵 **SoundCloud APIs**
+### 📺 YouTube API
 
-#### `GET /api/soundcloud/playlist`
-- **Parameters**:
-  - `url` (required): SoundCloud playlist URL
-- **Response**: Playlist information with track metadata
-- **Features**:
-  - Supports unlimited tracks with pagination
-  - Automatic fallback to single track if URL is not a playlist
-  - Handles short URLs and standard URLs
+#### **Unified Endpoint** (`/api/youtube`)
+Handles both individual videos and playlists with automatic URL type detection.
 
-#### `GET /api/soundcloud/track`
-- **Parameters**:
-  - `url` (required): SoundCloud track URL
-- **Response**: Individual track information and metadata
-- **Features**:
-  - Supports all SoundCloud URL formats
-  - Extracts stream URLs and metadata
-  - Progressive audio format support
+- **GET** `/api/youtube?url={video_or_playlist_url}`
+  - **Purpose**: Fetch video or playlist information
+  - **Response**: 
+    - For videos: `{ success: true, type: "video", data: { ...videoInfo } }`
+    - For playlists: `{ success: true, type: "playlist", data: { playlistInfo, tracks } }`
+  - **Error Handling**: Returns appropriate error codes for invalid URLs, private content, etc.
 
-### 📺 **YouTube APIs**
+#### **Download Endpoint** (`/api/youtube/download`)
+Handles audio downloads for individual YouTube videos.
 
-#### `GET /api/youtube/playlist`
-- **Parameters**:
-  - `url` (required): YouTube playlist URL
-- **Response**: Playlist information with video metadata
-- **Features**:
-  - Supports unlimited videos with pagination
-  - Extracts video metadata and thumbnails
-  - Handles private/unlisted playlists (if accessible)
+- **GET** `/api/youtube/download?url={video_url}&format={mp3|m4a}&quality={highestaudio|lowestaudio}`
+  - **Purpose**: Download audio from a YouTube video
+  - **Parameters**:
+    - `url`: YouTube video URL
+    - `format`: Audio format (default: mp3)
+    - `quality`: Audio quality (default: highestaudio)
+  - **Response**: Audio file stream with proper headers for download
 
-#### `GET /api/youtube/video`
-- **Parameters**:
-  - `url` (required): YouTube video URL
-- **Response**: Individual video information and metadata
-- **Features**:
-  - Supports all YouTube URL formats
-  - Extracts video metadata and thumbnails
-  - Multiple quality options
+### 🎵 SoundCloud API
 
-#### `GET /api/youtube/download`
-- **Parameters**:
-  - `url` (required): Stream URL
-  - `filename` (optional): Custom filename
-- **Response**: Audio file stream
-- **Features**:
-  - Proxy endpoint for secure downloads
-  - Progress tracking support
-  - Error handling and retry logic
+#### **Track Endpoint** (`/api/soundcloud/track`)
+Fetch individual track information.
+
+- **GET** `/api/soundcloud/track?url={track_url}`
+  - **Purpose**: Fetch track metadata
+  - **Response**: `{ success: true, track: { ...trackInfo } }`
+
+#### **Playlist Endpoint** (`/api/soundcloud/playlist`)
+Fetch playlist information.
+
+- **GET** `/api/soundcloud/playlist?url={playlist_url}`
+  - **Purpose**: Fetch playlist metadata and tracks
+  - **Response**: `{ success: true, playlist: { ...playlistInfo }, tracks: [...] }`
+
+#### **Download Endpoint** (`/api/soundcloud/download`)
+Handle audio downloads for SoundCloud tracks.
+
+- **GET** `/api/soundcloud/download?url={track_url}`
+  - **Purpose**: Download audio from a SoundCloud track
+  - **Response**: Audio file stream with proper headers for download
 
 ### 📊 **Response Format**
 

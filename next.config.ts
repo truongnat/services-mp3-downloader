@@ -33,38 +33,47 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, nextRuntime }) => {
     if (isServer) {
       // Ensure ffmpeg-static binary is properly handled
       config.externals = config.externals || [];
       config.externals.push({
-        "ffmpeg-static": "ffmpeg-static",
-        "fluent-ffmpeg": "fluent-ffmpeg",
-        "@distube/ytdl-core": "@distube/ytdl-core",
+        "ffmpeg-static": "commonjs ffmpeg-static",
+        "fluent-ffmpeg": "commonjs fluent-ffmpeg",
+        "@distube/ytdl-core": "commonjs @distube/ytdl-core",
+        "child_process": "commonjs child_process",
+        "fs": "commonjs fs",
+        "path": "commonjs path",
+        "os": "commonjs os",
+        "util": "commonjs util",
+        "events": "commonjs events",
+        "stream": "commonjs stream",
+        "buffer": "commonjs buffer",
       });
-
-      // Copy ffmpeg binary to the output directory
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        child_process: false,
-        net: false,
-        tls: false,
-      };
     } else {
       // Client-side: completely exclude server-only modules
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        child_process: false,
-        net: false,
-        tls: false,
-        "fluent-ffmpeg": false,
+      config.resolve.alias = {
+        ...config.resolve.alias,
         "ffmpeg-static": false,
+        "fluent-ffmpeg": false,
         "@distube/ytdl-core": false,
-        undici: false,
       };
     }
+
+    // For both server and client: properly handle Node.js built-in modules
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      child_process: false,
+      net: false,
+      tls: false,
+      os: false,
+      path: false,
+      util: false,
+      events: false,
+      stream: false,
+      buffer: false,
+    };
 
     return config;
   },
@@ -81,8 +90,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "ffmpeg-static",
     "fluent-ffmpeg",
-    "yt-dlp-static",
     "@distube/ytdl-core",
+    "yt-dlp-static",
     "undici",
   ],
 };

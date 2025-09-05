@@ -1,24 +1,23 @@
 import ytdl from "@distube/ytdl-core";
 import { Readable } from "stream";
-import { YouTubeTrackInfo, YouTubePlaylistInfo, YouTubePlaylistApiResponse } from "@/types/youtube";
-import { 
-  convertToMp3 as ffmpegConvertToMp3, 
-  convertToMp3WithFallback,
-  isFFmpegAvailable 
-} from "@/lib/ffmpeg-utils";
 import {
-  extractVideoId,
-  extractPlaylistId,
-  cleanRadioMixUrl,
-  isPlaylistUrl,
-  isVideoUrl
-} from "@/lib/youtube/url-utils";
+  YouTubePlaylistInfo,
+  YouTubePlaylistApiResponse,
+  YouTubeTrackInfo
+} from "@/types/youtube";
+import {
+  convertToMp3 as ffmpegConvertToMp3,
+  convertToMp3WithFallback,
+} from "@/lib/ffmpeg-utils";
+import { extractPlaylistId, cleanRadioMixUrl } from "@/lib/youtube/url-utils";
 
 export interface YouTubeDownloadOptions {
   url: string;
   quality?: "highest" | "lowest" | "highestaudio" | "lowestaudio";
   format?: "mp3" | "m4a" | "webm";
   filter?: "audioonly" | "videoonly" | "audioandvideo";
+  // Add option to pass pre-fetched info
+  info?: ytdl.videoInfo;
 }
 
 export interface YouTubeDownloadResult {
@@ -63,10 +62,12 @@ export async function getYouTubeVideoInfo(
         videoDetails.thumbnails?.[0]?.url ||
         `https://i.ytimg.com/vi/${videoDetails.videoId}/maxresdefault.jpg`,
       url: cleanUrl,
-      streamUrl: "", // Will be populated during download
+      streamUrl: null, // Will be populated during download
       format: undefined,
       size: undefined,
       bitrate: undefined,
+      // Include the full info object for downloadFromInfo
+      fullInfo: info,
     };
 
     return trackInfo;
@@ -77,7 +78,13 @@ export async function getYouTubeVideoInfo(
 }
 
 /**
- * Download YouTube video as audio stream
+ * Download YouTube video as audio stream using downloadFromInfo for better efficiency
+ *
+ * This function uses ytdl.downloadFromInfo() instead of ytdl() to avoid fetching
+ * video information twice. When we already have the video info (from getYouTubeVideoInfo),
+ * we can pass it directly to downloadFromInfo to create the stream.
+ *
+ * This optimization reduces network requests and improves download performance.
  */
 export async function downloadYouTubeAudio(
   options: YouTubeDownloadOptions
@@ -88,25 +95,39 @@ export async function downloadYouTubeAudio(
       quality = "highestaudio",
       format = "mp3",
       filter = "audioonly",
+      info: prefetchedInfo,
     } = options;
 
-    // Clean radio/mix URLs
-    const { isRadioMix, cleanUrl } = cleanRadioMixUrl(url);
+    let info, cleanUrl;
 
-    if (isRadioMix) {
-      console.log(`Detected radio/mix playlist, using clean URL: ${cleanUrl}`);
+    if (prefetchedInfo) {
+      // Use pre-fetched info
+      info = prefetchedInfo;
+      cleanUrl = url; // Assume URL is already clean if we have info
+      console.log("[YouTube] Using pre-fetched video info");
+    } else {
+      // Clean radio/mix URLs
+      const { isRadioMix, cleanUrl: cleanedUrl } = cleanRadioMixUrl(url);
+      cleanUrl = cleanedUrl;
+
+      if (isRadioMix) {
+        console.log(
+          `Detected radio/mix playlist, using clean URL: ${cleanUrl}`
+        );
+      }
+
+      // Validate URL
+      if (!ytdl.validateURL(cleanUrl)) {
+        return {
+          success: false,
+          error: "Invalid YouTube URL",
+        };
+      }
+
+      // Get video info once and reuse it for downloading
+      info = await ytdl.getInfo(cleanUrl);
     }
 
-    // Validate URL
-    if (!ytdl.validateURL(cleanUrl)) {
-      return {
-        success: false,
-        error: "Invalid YouTube URL",
-      };
-    }
-
-    // Get video info
-    const info = await ytdl.getInfo(cleanUrl);
     const videoDetails = info.videoDetails;
 
     // Check if video is available
@@ -124,11 +145,46 @@ export async function downloadYouTubeAudio(
       };
     }
 
-    // Create audio stream
-    const audioStream = ytdl(cleanUrl, {
-      quality,
+    // Log video format information for debugging
+    const formats = info.formats.filter((f) => f.hasAudio && !f.hasVideo);
+    console.log(
+      "[YouTube Formats] Available audio formats:",
+      formats.map((f: any) => ({
+        itag: f.itag,
+        quality: f.quality,
+        audioQuality: f.audioQuality,
+        mimeType: f.mimeType,
+        bitrate: f.bitrate,
+        container: f.container,
+      }))
+    );
+
+    // Select appropriate quality
+    let selectedQuality = quality;
+    if (quality === "highestaudio" || quality === "lowestaudio") {
+      // These are valid ytdl-core quality options
+    } else {
+      // Map our quality options to ytdl-core options
+      selectedQuality =
+        quality === "highest"
+          ? "highestaudio"
+          : quality === "lowest"
+          ? "lowestaudio"
+          : "highestaudio";
+    }
+
+    // Create audio stream using downloadFromInfo for better efficiency
+    const audioStream = ytdl.downloadFromInfo(info, {
+      quality: selectedQuality as any,
       filter,
       highWaterMark: 1024 * 1024 * 32, // 32MB buffer
+    });
+
+    console.log("[Audio Stream] Created stream with quality:", selectedQuality);
+
+    // Add error handling for the stream
+    audioStream.on("error", (err) => {
+      console.error("[Audio Stream] Stream error:", err);
     });
 
     return {
@@ -141,9 +197,35 @@ export async function downloadYouTubeAudio(
     };
   } catch (error) {
     console.error("[YouTube ytdl-core] Download error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
+    // Provide more specific error messages
+    if (errorMessage.includes("Status code: 429")) {
+      return {
+        success: false,
+        error:
+          "Too many requests - YouTube is rate limiting. Please try again later.",
+      };
+    }
+
+    if (errorMessage.includes("Video unavailable")) {
+      return {
+        success: false,
+        error: "Video is unavailable or has been removed.",
+      };
+    }
+
+    if (errorMessage.includes("Private video")) {
+      return {
+        success: false,
+        error: "Private videos cannot be downloaded.",
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: errorMessage,
     };
   }
 }
@@ -152,29 +234,29 @@ export async function downloadYouTubeAudio(
  * Convert audio stream to MP3 using ffmpeg
  */
 export async function convertToMp3(
-  inputStream: Readable, 
-  options: { 
+  inputStream: Readable,
+  options: {
     skipConversion?: boolean;
     timeout?: number;
   } = {}
 ): Promise<Readable> {
   const { skipConversion = false, timeout = 30000 } = options;
-  
+
   // Skip conversion if requested
   if (skipConversion) {
-    console.log('⚠️ Skipping FFmpeg conversion as requested');
+    console.log("⚠️ Skipping FFmpeg conversion as requested");
     return inputStream;
   }
-  
+
   try {
     return await ffmpegConvertToMp3(inputStream, {
       bitrate: 128,
       channels: 2,
       frequency: 44100,
-      timeout
+      timeout,
     });
   } catch (error) {
-    console.error('Failed to convert audio to MP3:', error);
+    console.error("Failed to convert audio to MP3:", error);
     // Return original stream as fallback
     return inputStream;
   }
@@ -195,7 +277,7 @@ export async function convertToMp3WithSmartFallback(
     channels: 2,
     frequency: 44100,
     maxRetries: options.maxRetries || 2,
-    retryTimeout: options.retryTimeout || 15000
+    retryTimeout: options.retryTimeout || 15000,
   });
 }
 
@@ -217,32 +299,38 @@ export async function getYouTubePlaylistInfo(
 
     // Check for radio/mix playlists
     if (playlistId.startsWith("RD")) {
-      throw new Error("Radio/mix playlists are not supported. Please use individual video URLs instead.");
+      throw new Error(
+        "Radio/mix playlists are not supported. Please use individual video URLs instead."
+      );
     }
 
-    console.log(`[YouTube Playlist] Getting playlist info for ID: ${playlistId}`);
+    console.log(
+      `[YouTube Playlist] Getting playlist info for ID: ${playlistId}`
+    );
 
     // For now, return a limited response since ytdl-core doesn't fully support playlists
     // This is a placeholder implementation that users can enhance with external services
     const playlistInfo: YouTubePlaylistInfo = {
       id: playlistId,
       title: "YouTube Playlist (Limited Support)",
-      description: "Due to ytdl-core limitations, full playlist enumeration is not available. Please download videos individually.",
+      description:
+        "Due to ytdl-core limitations, full playlist enumeration is not available. Please download videos individually.",
       artwork: "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
       tracksCount: 0,
-      author: "YouTube"
+      author: "YouTube",
     };
 
     // Return empty tracks array with informational message
     const tracks: YouTubeTrackInfo[] = [];
 
-    console.log(`[YouTube Playlist] Returning limited playlist info for ${playlistId}`);
+    console.log(
+      `[YouTube Playlist] Returning limited playlist info for ${playlistId}`
+    );
 
     return {
       playlistInfo,
-      tracks
+      tracks,
     };
-
   } catch (error) {
     console.error("[YouTube Playlist] Error getting playlist info:", error);
     throw error;

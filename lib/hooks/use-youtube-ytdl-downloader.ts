@@ -28,11 +28,17 @@ export function useYouTubeDownloader(options: UseYouTubeDownloaderOptions = {}) 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await fetch(`/api/youtube/ytdl-info?url=${encodeURIComponent(url)}`);
+      // Use the new unified endpoint
+      const response = await fetch(`/api/youtube?url=${encodeURIComponent(url)}`);
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to get video info');
+      }
+
+      // Check if it's actually a video
+      if (result.type !== 'video') {
+        throw new Error('URL is not a YouTube video');
       }
 
       const trackInfo = result.data;
@@ -65,7 +71,7 @@ export function useYouTubeDownloader(options: UseYouTubeDownloaderOptions = {}) 
     try {
       const { filename, format = 'mp3', quality = 'highestaudio' } = downloadOptions;
       
-      // Build download URL
+      // Build download URL using the new unified endpoint
       const params = new URLSearchParams({
         url,
         format,
@@ -76,7 +82,7 @@ export function useYouTubeDownloader(options: UseYouTubeDownloaderOptions = {}) 
         params.append('filename', filename);
       }
 
-      const downloadUrl = `/api/youtube/ytdl-download?${params.toString()}`;
+      const downloadUrl = `/api/youtube/download?${params.toString()}`;
       
       // Start download
       const response = await fetch(downloadUrl);

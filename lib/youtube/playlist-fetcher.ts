@@ -13,6 +13,8 @@ import { getYouTubeVideoInfo } from "./ytdl-downloader";
 export async function fetchYouTubePlaylist(playlistUrl: string): Promise<YouTubePlaylistApiResponse> {
   try {
     console.log(`[YouTube Playlist Fetcher] Processing: ${playlistUrl}`);
+    console.log(`[YouTube Playlist Fetcher] Playlist URL length: ${playlistUrl.length}`);
+    console.log(`[YouTube Playlist Fetcher] Playlist URL contains list param: ${playlistUrl.includes('list=')}`);
 
     // Extract playlist ID
     const playlistId = extractPlaylistId(playlistUrl);
@@ -81,7 +83,8 @@ async function fetchDetailedTrackInfo(basicTracks: YouTubeTrackInfo[]): Promise<
   console.log(`[YouTube Playlist Fetcher] Fetching detailed info for ${basicTracks.length} tracks...`);
   
   // Process tracks in batches to avoid overwhelming the API
-  const batchSize = 3; // Smaller batches for ytdl-core
+  // Increase batch size for better performance with larger playlists
+  const batchSize = 5;
   for (let i = 0; i < basicTracks.length; i += batchSize) {
     const batch = basicTracks.slice(i, i + batchSize);
     
@@ -89,21 +92,14 @@ async function fetchDetailedTrackInfo(basicTracks: YouTubeTrackInfo[]): Promise<
     const batchPromises = batch.map(async (track, index) => {
       try {
         console.log(`[YouTube Playlist Fetcher] (${i + index + 1}/${basicTracks.length}) Fetching details for: ${track.title}`);
-        
-        // Use ytdl-core directly to get detailed video info
         const detailedInfo = await getYouTubeVideoInfo(track.url);
-        
         console.log(`[YouTube Playlist Fetcher] ✅ Got details for: ${detailedInfo.title} by ${detailedInfo.artist}`);
-        
-        return detailedInfo;
+        const { fullInfo, ...sanitized } = detailedInfo as any;
+        return sanitized as YouTubeTrackInfo;
       } catch (error) {
         console.warn(`[YouTube Playlist Fetcher] ⚠️ Failed to get details for ${track.id}:`, error);
-        // Return basic track info as fallback with better defaults
-        return {
-          ...track,
-          artist: track.artist || "Unknown Artist",
-          duration: track.duration || 0,
-        };
+        // Skip tracks that cannot be fetched
+        return null as any;
       }
     });
     
@@ -112,22 +108,17 @@ async function fetchDetailedTrackInfo(basicTracks: YouTubeTrackInfo[]): Promise<
     
     // Add successful results to the detailed tracks array
     batchResults.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && result.value) {
         detailedTracks.push(result.value);
       } else {
-        console.warn(`[YouTube Playlist Fetcher] Failed to process track ${batch[index].id}:`, result.reason);
-        detailedTracks.push({
-          ...batch[index],
-          artist: batch[index].artist || "Unknown Artist",
-          duration: batch[index].duration || 0,
-        }); // Add basic info as fallback
+        console.warn(`[YouTube Playlist Fetcher] Skipping track ${batch[index].id} due to failed fetch`);
       }
     });
     
     // Small delay between batches to be respectful
     if (i + batchSize < basicTracks.length) {
       console.log(`[YouTube Playlist Fetcher] Processed ${Math.min(i + batchSize, basicTracks.length)}/${basicTracks.length} tracks, waiting before next batch...`);
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
     }
   }
   
@@ -186,7 +177,8 @@ function extractVideoList(html: string): YouTubeTrackInfo[] {
   try {
     // Look for video data in the HTML
     // YouTube embeds video data in JSON within script tags
-    const scriptMatches = html.match(/"videoId":"([^"]+)","title":{"runs":\[{"text":"([^"]+)"/g);
+    // Enhanced pattern to capture more video entries
+    const scriptMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"[^}]*?"title":{"runs":\[{"text":"([^"]+)"/g);
     
     if (scriptMatches) {
       const seenVideoIds = new Set<string>();
@@ -203,11 +195,17 @@ function extractVideoList(html: string): YouTubeTrackInfo[] {
           if (seenVideoIds.has(videoId)) continue;
           seenVideoIds.add(videoId);
           
+          const titleLower = title.toLowerCase();
+          if (titleLower === 'private video' || titleLower === 'deleted video') {
+            console.log(`[YouTube Playlist Fetcher] Skipping ${title}`);
+            continue;
+          }
+
           const track: YouTubeTrackInfo = {
             id: videoId,
             title,
-            artist: "Unknown", // Will be updated when individual video is loaded
-            duration: 0, // Will be updated when individual video is loaded
+            artist: "Unknown",
+            duration: 0,
             artwork: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
             url: `https://www.youtube.com/watch?v=${videoId}`,
             streamUrl: null,
@@ -229,22 +227,73 @@ function extractVideoList(html: string): YouTubeTrackInfo[] {
       const minLength = Math.min(videoIds.length, titles.length);
       const seenVideoIds = new Set<string>();
       
-      for (let i = 0; i < minLength && tracks.length < 50; i++) {
+      for (let i = 0; i < minLength; i++) {
         const videoId = videoIds[i];
         const title = titles[i];
         
         if (seenVideoIds.has(videoId)) continue;
         seenVideoIds.add(videoId);
         
+        const normalizedTitle = title.replace(/\\u0026/g, '&').replace(/\\"/g, '"');
+        const titleLower = normalizedTitle.toLowerCase();
+        if (titleLower === 'private video' || titleLower === 'deleted video') {
+          console.log(`[YouTube Playlist Fetcher] Skipping ${normalizedTitle}`);
+          continue;
+        }
+
         tracks.push({
           id: videoId,
-          title: title.replace(/\\u0026/g, '&').replace(/\\"/g, '"'),
+          title: normalizedTitle,
           artist: "Unknown",
           duration: 0,
           artwork: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
           url: `https://www.youtube.com/watch?v=${videoId}`,
           streamUrl: null,
         });
+      }
+    }
+    
+    // Additional pattern for more comprehensive video extraction
+    if (tracks.length === 0) {
+      // Try to find video data in ytInitialData script
+      const ytInitialDataMatch = html.match(/var ytInitialData = (.*?);<\/script>/s);
+      if (ytInitialDataMatch) {
+        try {
+          const ytInitialData = JSON.parse(ytInitialDataMatch[1]);
+          // Extract videos from the playlist data
+          const playlistContents = ytInitialData?.contents?.twoColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.playlistVideoListRenderer?.contents;
+          
+          if (Array.isArray(playlistContents)) {
+            const seenVideoIds = new Set<string>();
+            for (const item of playlistContents) {
+              const video = item?.playlistVideoRenderer;
+              if (video?.videoId && video?.title?.runs?.[0]?.text) {
+                const videoId = video.videoId;
+                const title = video.title.runs[0].text;
+                const titleLower = title.toLowerCase();
+                if (titleLower === 'private video' || titleLower === 'deleted video') {
+                  console.log(`[YouTube Playlist Fetcher] Skipping ${title}`);
+                  continue;
+                }
+                
+                if (seenVideoIds.has(videoId)) continue;
+                seenVideoIds.add(videoId);
+                
+                tracks.push({
+                  id: videoId,
+                  title,
+                  artist: "Unknown",
+                  duration: 0,
+                  artwork: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+                  url: `https://www.youtube.com/watch?v=${videoId}`,
+                  streamUrl: null,
+                });
+              }
+            }
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse ytInitialData:", parseError);
+        }
       }
     }
 

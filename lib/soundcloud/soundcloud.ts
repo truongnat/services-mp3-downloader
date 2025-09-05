@@ -240,35 +240,18 @@ async function handlePlaylist(
     if (playlistInfo.tracksCount > tracksRaw.length) {
       tracksRaw = await fetchAllTracksPaged(clean, playlistInfo.tracksCount, maxTracks);
     }
-    // 4. Map tracks (thêm streamUrl thực sự)
-    const tracks: SoundCloudTrackInfo[] = await Promise.all(tracksRaw.map(async (track) => {
-      let streamUrl: string | null = null;
-      try {
-        if (track.media && Array.isArray(track.media.transcodings)) {
-          const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
-          if (progressive) {
-            const clientId = await getDynamicClientId();
-            const url = `${progressive.url}?client_id=${clientId}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              streamUrl = data.url || null;
-            }
-          }
-        }
-      } catch { }
-      return {
-        id: String(track.id),
-        title: track.title,
-        artist: track.user?.username || "",
-        duration: track.duration,
-        artwork: track.artwork_url || playlist.artwork_url || track.user?.avatar_url || "",
-        url: track.permalink_url,
-        streamUrl,
-        size: undefined,
-        bitrate: undefined,
-        format: undefined,
-      };
+    // 4. Map tracks without prefetching stream URLs for performance
+    const tracks: SoundCloudTrackInfo[] = tracksRaw.map((track) => ({
+      id: String(track.id),
+      title: track.title,
+      artist: track.user?.username || "",
+      duration: track.duration,
+      artwork: track.artwork_url || playlist.artwork_url || track.user?.avatar_url || "",
+      url: track.permalink_url,
+      streamUrl: undefined,
+      size: undefined,
+      bitrate: undefined,
+      format: undefined,
     }));
     return { playlistInfo, tracks };
   } catch (err) {
@@ -279,22 +262,8 @@ async function handlePlaylist(
 // Handle single track logic
 async function handleSingleTrack(track: SoundcloudTrack): Promise<SoundCloudPlaylistApiResponse> {
   try {
-    // Get stream URL
-    let streamUrl: string | null = null;
-    try {
-      if (track.media && Array.isArray(track.media.transcodings)) {
-        const progressive = track.media.transcodings.find((t: any) => t.format.protocol === "progressive");
-        if (progressive) {
-          const clientId = await getDynamicClientId();
-          const url = `${progressive.url}?client_id=${clientId}`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            streamUrl = data.url || null;
-          }
-        }
-      }
-    } catch { }
+    // Skip prefetching stream URL for performance; it will be resolved during download
+    const streamUrl: string | null = null;
 
     // Create playlist-like response for single track
     const playlistInfo: SoundCloudPlaylistInfo = {
@@ -452,39 +421,19 @@ export async function searchTracks(
 
     console.log(`${streamableTracks.length} tracks are streamable`);
 
-    // Map tracks to our format
-    const tracks: SoundCloudTrackInfo[] = await Promise.all(
-      streamableTracks.map(async (track) => {
-        let streamUrl: string | null = null;
-        try {
-          if (track.media && Array.isArray(track.media.transcodings)) {
-            const progressive = track.media.transcodings.find((t: SoundCloudTranscoding) => t.format.protocol === "progressive");
-            if (progressive) {
-              const clientId = await getDynamicClientId();
-              const url = `${progressive.url}?client_id=${clientId}`;
-              const res = await fetch(url);
-              if (res.ok) {
-                const data = await res.json();
-                streamUrl = data.url || null;
-              }
-            }
-          }
-        } catch { }
-        
-        return {
-          id: String(track.id),
-          title: track.title,
-          artist: track.user?.username || "",
-          duration: track.duration,
-          artwork: track.artwork_url || track.user?.avatar_url || "",
-          url: track.permalink_url,
-          streamUrl,
-          size: undefined,
-          bitrate: undefined,
-          format: undefined,
-        };
-      })
-    );
+    // Map tracks to our format without prefetching stream URLs for performance
+    const tracks: SoundCloudTrackInfo[] = streamableTracks.map((track) => ({
+      id: String(track.id),
+      title: track.title,
+      artist: track.user?.username || "",
+      duration: track.duration,
+      artwork: track.artwork_url || track.user?.avatar_url || "",
+      url: track.permalink_url,
+      streamUrl: undefined,
+      size: undefined,
+      bitrate: undefined,
+      format: undefined,
+    }));
 
     return {
       tracks,

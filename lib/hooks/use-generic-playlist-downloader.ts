@@ -107,6 +107,13 @@ export function useGenericPlaylistDownloader<T extends CommonTrackInfo>() {
   const loadPlaylist = useCallback(async (apiEndpoint: string, explicitUrl?: string) => {
     const urlToUse = explicitUrl || url;
     
+    console.log('[useGenericPlaylistDownloader] loadPlaylist called with:');
+    console.log('  apiEndpoint:', apiEndpoint);
+    console.log('  explicitUrl:', explicitUrl);
+    console.log('  url state:', url);
+    console.log('  urlToUse:', urlToUse);
+    console.log('  urlToUse length:', urlToUse.length);
+    
     if (!urlToUse.trim()) {
       setPlaylist(prev => ({ ...prev, error: ERROR_MESSAGES.INVALID_URL }));
       return;
@@ -193,6 +200,10 @@ export function useGenericPlaylistDownloader<T extends CommonTrackInfo>() {
       } else if (platform === 'youtube') {
         if (isPlaylistUrl(urlToUse.trim())) {
           // YouTube playlist
+          console.log('[useGenericPlaylistDownloader] Detected YouTube playlist URL');
+          console.log('[useGenericPlaylistDownloader] URL to send to API:', urlToUse.trim());
+          console.log('[useGenericPlaylistDownloader] URL length:', urlToUse.trim().length);
+          
           response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(urlToUse.trim())}`);
           data = await response.json();
 
@@ -205,6 +216,7 @@ export function useGenericPlaylistDownloader<T extends CommonTrackInfo>() {
           data.playlistInfo = data.data.playlistInfo;
         } else {
           // Single YouTube video - convert to playlist format
+          console.log('[useGenericPlaylistDownloader] Detected YouTube video URL');
           try {
             response = await fetch(`/api/youtube/ytdl-info?url=${encodeURIComponent(urlToUse.trim())}`);
             const videoData = await response.json();
@@ -233,7 +245,12 @@ export function useGenericPlaylistDownloader<T extends CommonTrackInfo>() {
       }
 
       if (!data.tracks || data.tracks.length === 0) {
-        throw new Error(ERROR_MESSAGES.NO_TRACKS);
+        // Allow empty result for YouTube playlists after filtering out private/deleted/unfetchable videos
+        const isYouTube = detectPlatform(urlToUse.trim()) === 'youtube'
+        const isYTPlaylist = isYouTube && isPlaylistUrl(urlToUse.trim())
+        if (!isYTPlaylist) {
+          throw new Error(ERROR_MESSAGES.NO_TRACKS);
+        }
       }
 
       setPlaylist({

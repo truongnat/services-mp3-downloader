@@ -82,19 +82,46 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
         abortSignal: controller.signal,
       };
 
-      const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
+      console.log('Starting download for track:', track);
+      const { blob, metadata, effectiveFormat, contentType } = await EnhancedDownloader.downloadTrack(downloadOptions);
+      console.log('Download completed. Blob size:', blob.size, 'Metadata:', metadata);
       
       // For SoundCloud, the optimized downloader handles file saving automatically
-      // For other platforms, generate filename and save manually
-      if (track.platform !== 'soundcloud' && blob.size > 0) {
-        const filename = EnhancedDownloader.generateFilename(
-          metadata, 
-          downloadOptions.format || settings.format, 
-          settings,
-          0 // Single track download gets index 0
-        );
-        EnhancedDownloader.saveFile(blob, filename);
+      // For other platforms (including YouTube), generate filename and save manually
+      if (track.platform !== 'soundcloud') {
+        console.log('Platform is not SoundCloud, checking blob...');
+        if (blob.size > 0) {
+          console.log('Blob has content, generating filename...');
+          // Determine final format from effective format/contentType or fallback to requested format
+          let finalFormat = effectiveFormat || (contentType?.includes('audio/mp4') ? 'm4a' : contentType?.includes('audio/mpeg') ? 'mp3' : (downloadOptions.format || settings.format));
+          const filename = EnhancedDownloader.generateFilename(
+            metadata, 
+            finalFormat, 
+            settings,
+            0 // Single track download gets index 0
+          );
+          console.log('Saving file with filename:', filename);
+          console.log('Calling EnhancedDownloader.saveFile...');
+          EnhancedDownloader.saveFile(blob, filename);
+          console.log('EnhancedDownloader.saveFile completed');
+        } else {
+          console.warn('Skipping file save - blob is empty');
+        }
+      } else {
+        console.log('SoundCloud track - file save handled by optimized downloader');
       }
+
+      // Ensure UI shows completion state for this track
+      setDownloadState(prev => ({
+        ...prev,
+        trackProgress: {
+          ...prev.trackProgress,
+          [track.id]: {
+            ...(prev.trackProgress[track.id] || { percent: 100, downloaded: 0, total: 0 }),
+            percent: 100,
+          },
+        },
+      }));
 
       setDownloadState(prev => ({
         ...prev,
@@ -167,21 +194,47 @@ export function useEnhancedDownloader(): UseEnhancedDownloaderReturn {
             abortSignal: controller.signal,
           };
 
-          const { blob, metadata } = await EnhancedDownloader.downloadTrack(downloadOptions);
+          console.log(`Starting download for track ${i + 1}/${tracks.length}:`, track);
+          const { blob, metadata, effectiveFormat, contentType } = await EnhancedDownloader.downloadTrack(downloadOptions);
+          console.log(`Download completed for track ${i + 1}. Blob size:`, blob.size, 'Metadata:', metadata);
           
           // For SoundCloud, the optimized downloader handles file saving automatically
-          // For other platforms, generate filename and save manually
-          if (track.platform !== 'soundcloud' && blob.size > 0) {
-            const filename = EnhancedDownloader.generateFilename(
-              metadata, 
-              downloadOptions.format || settings.format, 
-              settings,
-              i // Use loop index for track numbering
-            );
-            EnhancedDownloader.saveFile(blob, filename);
+          // For other platforms (including YouTube), generate filename and save manually
+          if (track.platform !== 'soundcloud') {
+            console.log(`Track ${i + 1} is not SoundCloud, checking blob...`);
+            if (blob.size > 0) {
+              console.log(`Blob for track ${i + 1} has content, generating filename...`);
+              let finalFormat = effectiveFormat || (contentType?.includes('audio/mp4') ? 'm4a' : contentType?.includes('audio/mpeg') ? 'mp3' : (downloadOptions.format || settings.format));
+              const filename = EnhancedDownloader.generateFilename(
+                metadata, 
+                finalFormat, 
+                settings,
+                i // Use loop index for track numbering
+              );
+              console.log('Saving file with filename:', filename);
+              console.log('Calling EnhancedDownloader.saveFile...');
+              EnhancedDownloader.saveFile(blob, filename);
+              console.log('EnhancedDownloader.saveFile completed');
+            } else {
+              console.warn(`Skipping file save for track ${i + 1} - blob is empty`);
+            }
+          } else {
+            console.log(`Track ${i + 1} is SoundCloud - file save handled by optimized downloader`);
           }
 
           completed++;
+
+          // Ensure per-track completion is reflected even if no content-length
+          setDownloadState(prev => ({
+            ...prev,
+            trackProgress: {
+              ...prev.trackProgress,
+              [track.id]: {
+                ...(prev.trackProgress[track.id] || { percent: 100, downloaded: 0, total: 0 }),
+                percent: 100,
+              },
+            },
+          }));
           
           setDownloadState(prev => ({
             ...prev,

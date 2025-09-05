@@ -1,5 +1,7 @@
-import ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
+
+// Only import fluent-ffmpeg on the server side
+let ffmpeg: any;
 
 let isFFmpegInitialized = false;
 let ffmpegAvailable = false;
@@ -8,15 +10,24 @@ let ffmpegAvailable = false;
  * Initialize FFmpeg with proper error handling
  */
 async function initializeFFmpeg(): Promise<boolean> {
-  if (isFFmpegInitialized) {
-    return ffmpegAvailable;
-  }
-
   // Only initialize on server-side
   if (typeof window !== "undefined") {
     isFFmpegInitialized = true;
     ffmpegAvailable = false;
     return false;
+  }
+
+  // Dynamically import fluent-ffmpeg only on the server side
+  if (!ffmpeg) {
+    try {
+      const ffmpegModule = await import('fluent-ffmpeg');
+      ffmpeg = ffmpegModule.default || ffmpegModule;
+    } catch (error) {
+      console.error("❌ Failed to import fluent-ffmpeg:", error);
+      ffmpegAvailable = false;
+      isFFmpegInitialized = true;
+      return false;
+    }
   }
 
   try {
@@ -34,7 +45,7 @@ async function initializeFFmpeg(): Promise<boolean> {
   } catch (error) {
     console.warn(
       "⚠️ Failed to load ffmpeg-static, trying system FFmpeg:",
-      error
+      error instanceof Error ? error.message : error
     );
 
     // Fallback: try to use system FFmpeg
@@ -45,7 +56,8 @@ async function initializeFFmpeg(): Promise<boolean> {
       console.log("✅ System FFmpeg fallback configured");
       ffmpegAvailable = true;
     } catch (systemError) {
-      console.error("❌ No FFmpeg available (neither static nor system)");
+      console.error("❌ No FFmpeg available (neither static nor system):", 
+        systemError instanceof Error ? systemError.message : systemError);
       ffmpegAvailable = false;
     }
   }
@@ -107,19 +119,21 @@ export async function convertToMp3(
         .audioChannels(channels)
         .audioFrequency(frequency)
         .format("mp3")
-        .on("start", (commandLine) => {
+        .on("start", (commandLine: any) => {
           console.log("🎵 FFmpeg conversion started:", commandLine);
         })
-        .on("progress", (progress) => {
+        .on("progress", (progress: any) => {
           // Log progress periodically
           if (progress.percent && progress.percent % 10 === 0) {
             console.log(`🎵 FFmpeg progress: ${progress.percent}%`);
           }
         })
-        .on("error", (err) => {
+        .on("error", (err: any) => {
           clearTimeout(timeoutId);
           if (!isResolved) {
             console.error("❌ FFmpeg conversion error:", err.message);
+            console.error("❌ FFmpeg error code:", err.code);
+            console.error("❌ FFmpeg error cmd:", err.cmd);
             console.warn("⚠️ Falling back to original stream");
             isResolved = true;
             resolve(inputStream);
@@ -137,7 +151,7 @@ export async function convertToMp3(
       const outputStream = ffmpegCommand.pipe();
 
       // Handle output stream errors
-      outputStream.on("error", (err) => {
+      outputStream.on("error", (err: any) => {
         clearTimeout(timeoutId);
         if (!isResolved) {
           console.error("❌ FFmpeg output stream error:", err.message);

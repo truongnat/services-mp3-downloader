@@ -56,7 +56,7 @@ export default function Home() {
                 <PlaylistDownloaderSoundCloud setDisableTabs={setDisableTabs} />
               </CardContent>
               <CardFooter className="text-xs sm:text-sm text-muted-foreground px-4 sm:px-6">
-                Supported format: SoundCloud playlist URLs
+                Search tracks or paste SoundCloud playlist/track URLs
               </CardFooter>
             </Card>
           </TabsContent>

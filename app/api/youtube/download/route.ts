@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  downloadYouTubeAudio,
-  getYouTubeVideoInfo,
-  convertToMp3WithSmartFallback,
-} from "@/lib/youtube/ytdl-downloader";
+import { isPlaylistUrl, isVideoUrl } from "@/lib/youtube/url-utils";
+import { downloadYouTubeAudio, getYouTubeVideoInfo, convertToMp3WithSmartFallback } from "@/lib/youtube/ytdl-downloader";
 import { Readable } from "stream";
 
 export const runtime = "nodejs";
@@ -137,7 +134,7 @@ export async function GET(req: NextRequest) {
   const timeout = parseInt(req.nextUrl.searchParams.get("timeout") || "30000");
 
   // Log request parameters for debugging
-  console.log("[YouTube API] Download request parameters:", {
+  console.log("[YouTube Download API] Download request parameters:", {
     url: videoUrl,
     format,
     quality,
@@ -150,156 +147,183 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    console.log(`[YouTube ytdl-core] Starting download: ${videoUrl}`);
+    // Determine if it's a playlist or video URL
+    const isPlaylist = isPlaylistUrl(videoUrl);
+    const isVideo = isVideoUrl(videoUrl);
 
-    // Get video info first (this will be reused for download)
-    const videoInfo = await getYouTubeVideoInfo(videoUrl);
+    console.log(`[YouTube Download API] URL Type - Playlist: ${isPlaylist}, Video: ${isVideo}`);
 
-    console.log(
-      `[YouTube ytdl-core] Video info: ${videoInfo.title} by ${videoInfo.artist}`
-    );
+    if (isVideo) {
+      // Handle individual video download (existing logic)
+      console.log(`[YouTube Download API] Processing as video: ${videoUrl}`);
 
-    // Download audio stream using the pre-fetched info for better efficiency
-    // This avoids fetching the video info twice, improving performance
-    const downloadResult = await downloadYouTubeAudio({
-      url: videoUrl,
-      quality: quality as any,
-      format: format as any,
-      filter: "audioonly",
-      info: videoInfo.fullInfo, // Pass the pre-fetched info
-    });
+      // Get video info first (this will be reused for download)
+      const videoInfo = await getYouTubeVideoInfo(videoUrl);
 
-    console.log("[YouTube API] Download result:", {
-      success: downloadResult.success,
-      hasStream: !!downloadResult.stream,
-      title: downloadResult.title,
-      error: downloadResult.error,
-    });
+      console.log(
+        `[YouTube Download API] Video info: ${videoInfo.title} by ${videoInfo.artist}`
+      );
 
-    if (!downloadResult.success || !downloadResult.stream) {
+      // Download audio stream using the pre-fetched info for better efficiency
+      // This avoids fetching the video info twice, improving performance
+      const downloadResult = await downloadYouTubeAudio({
+        url: videoUrl,
+        quality: quality as any,
+        format: format as any,
+        filter: "audioonly",
+        info: videoInfo.fullInfo, // Pass the pre-fetched info
+      });
+
+      console.log("[YouTube Download API] Download result:", {
+        success: downloadResult.success,
+        hasStream: !!downloadResult.stream,
+        title: downloadResult.title,
+        error: downloadResult.error,
+      });
+
+      if (!downloadResult.success || !downloadResult.stream) {
+        return NextResponse.json(
+          {
+            error: downloadResult.error || "Failed to get audio stream",
+            code: "download_failed",
+          },
+          { status: 400 }
+        );
+      }
+
+      console.log(`[YouTube Download API] Audio stream obtained, processing...`);
+
+      // Convert to MP3 if needed with smart fallback
+      let audioStream = downloadResult.stream;
+      let actualFormat = format;
+
+      if (format === "mp3") {
+        console.log(`🎵 Converting to MP3 with smart fallback...`);
+
+        if (skipConversion) {
+          console.log("⚠️ MP3 conversion skipped by request");
+          actualFormat = "m4a"; // Likely the original format
+        } else {
+          console.log(
+            "[YouTube Download API] Starting FFmpeg conversion with timeout:",
+            timeout
+          );
+          const conversionResult = await convertToMp3WithSmartFallback(
+            downloadResult.stream,
+            {
+              maxRetries: 2,
+              retryTimeout: timeout,
+            }
+          );
+
+          audioStream = conversionResult.stream;
+          const converted = conversionResult.converted;
+          console.log("[YouTube Download API] FFmpeg conversion result:", {
+            converted,
+            hasStream: !!audioStream,
+          });
+
+          if (!converted) {
+            console.warn("⚠️ MP3 conversion failed, serving original format");
+            actualFormat = "m4a"; // Fallback format
+          }
+        }
+      }
+
+      // Generate filename with actual format
+      const baseFilename = rawFilename
+        ? sanitizeFilename(rawFilename.replace(/\.[^/.]+$/, "")) // Remove extension if present
+        : sanitizeFilename(videoInfo.title);
+
+      const filename = `${baseFilename}.${actualFormat}`;
+
+      // Log final response details
+      console.log("[YouTube Download API] Final response details:", {
+        filename,
+        actualFormat,
+        contentType: actualFormat === "mp3" ? "audio/mpeg" : "audio/mp4",
+      });
+
+      // Set response headers with correct content type
+      const headers = new Headers();
+      headers.set(
+        "Content-Type",
+        actualFormat === "mp3" ? "audio/mpeg" : "audio/mp4"
+      );
+      headers.set(
+        "Content-Disposition",
+        createContentDispositionHeader(filename)
+      );
+      headers.set("Transfer-Encoding", "chunked");
+
+      // Add cache headers to prevent caching issues
+      headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+      headers.set("Pragma", "no-cache");
+      headers.set("Expires", "0");
+
+      // Add custom header to indicate if conversion was successful
+      headers.set(
+        "X-Conversion-Status",
+        actualFormat === format ? "success" : "fallback"
+      );
+
+      console.log(
+        `[YouTube Download API] Streaming ${filename} (format: ${actualFormat})`
+      );
+
+      // Convert Node.js stream to Web Stream for Next.js response
+      const webStream = new ReadableStream({
+        async start(controller) {
+          audioStream.on('data', (chunk) => {
+            controller.enqueue(new Uint8Array(chunk));
+          });
+          
+          audioStream.on('end', () => {
+            controller.close();
+          });
+          
+          audioStream.on('error', (err) => {
+            controller.error(err);
+          });
+        },
+        async cancel() {
+          audioStream.destroy();
+        }
+      });
+      
+      // Stream the response
+      return new NextResponse(webStream, {
+        status: 200,
+        headers,
+      });
+    } else if (isPlaylist) {
+      // Handle playlist URL - this shouldn't happen as playlists are processed differently
       return NextResponse.json(
         {
-          error: downloadResult.error || "Failed to get audio stream",
-          code: "download_failed",
+          error: "Playlist URLs cannot be downloaded directly. Please process the playlist first and then download individual tracks.",
+          code: "playlist_url_not_supported"
+        },
+        { status: 400 }
+      );
+    } else {
+      // Neither video nor playlist
+      return NextResponse.json(
+        {
+          error: "Invalid YouTube URL. Please provide a valid YouTube video URL.",
+          code: "invalid_url"
         },
         { status: 400 }
       );
     }
-
-    console.log(`[YouTube ytdl-core] Audio stream obtained, processing...`);
-
-    // Convert to MP3 if needed with smart fallback
-    let audioStream = downloadResult.stream;
-    let actualFormat = format;
-
-    if (format === "mp3") {
-      console.log(`🎵 Converting to MP3 with smart fallback...`);
-
-      if (skipConversion) {
-        console.log("⚠️ MP3 conversion skipped by request");
-        actualFormat = "m4a"; // Likely the original format
-      } else {
-        console.log(
-          "[YouTube API] Starting FFmpeg conversion with timeout:",
-          timeout
-        );
-        const conversionResult = await convertToMp3WithSmartFallback(
-          downloadResult.stream,
-          {
-            maxRetries: 2,
-            retryTimeout: timeout,
-          }
-        );
-
-        audioStream = conversionResult.stream;
-        const converted = conversionResult.converted;
-        console.log("[YouTube API] FFmpeg conversion result:", {
-          converted,
-          hasStream: !!audioStream,
-        });
-
-        if (!converted) {
-          console.warn("⚠️ MP3 conversion failed, serving original format");
-          actualFormat = "m4a"; // Fallback format
-        }
-      }
-    }
-
-    // Generate filename with actual format
-    const baseFilename = rawFilename
-      ? sanitizeFilename(rawFilename.replace(/\.[^/.]+$/, "")) // Remove extension if present
-      : sanitizeFilename(videoInfo.title);
-
-    const filename = `${baseFilename}.${actualFormat}`;
-
-    // Log final response details
-    console.log("[YouTube API] Final response details:", {
-      filename,
-      actualFormat,
-      contentType: actualFormat === "mp3" ? "audio/mpeg" : "audio/mp4",
-    });
-
-    // Set response headers with correct content type
-    const headers = new Headers();
-    headers.set(
-      "Content-Type",
-      actualFormat === "mp3" ? "audio/mpeg" : "audio/mp4"
-    );
-    headers.set(
-      "Content-Disposition",
-      createContentDispositionHeader(filename)
-    );
-    headers.set("Transfer-Encoding", "chunked");
-
-    // Add cache headers to prevent caching issues
-    headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-    headers.set("Pragma", "no-cache");
-    headers.set("Expires", "0");
-
-    // Add custom header to indicate if conversion was successful
-    headers.set(
-      "X-Conversion-Status",
-      actualFormat === format ? "success" : "fallback"
-    );
-
-    console.log(
-      `[YouTube ytdl-core] Streaming ${filename} (format: ${actualFormat})`
-    );
-
-    // Convert Node.js stream to Web Stream for Next.js response
-    const webStream = new ReadableStream({
-      async start(controller) {
-        audioStream.on('data', (chunk) => {
-          controller.enqueue(new Uint8Array(chunk));
-        });
-        
-        audioStream.on('end', () => {
-          controller.close();
-        });
-        
-        audioStream.on('error', (err) => {
-          controller.error(err);
-        });
-      },
-      async cancel() {
-        audioStream.destroy();
-      }
-    });
-    
-    // Stream the response
-    return new NextResponse(webStream, {
-      status: 200,
-      headers,
-    });
   } catch (error) {
-    console.error("[YouTube ytdl-core] Download error:", error);
+    console.error("[YouTube Download API] Download error:", error);
 
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : "No stack trace";
 
     // Log detailed error information
-    console.error("[YouTube ytdl-core] Error details:", {
+    console.error("[YouTube Download API] Error details:", {
       message: errorMessage,
       stack: errorStack,
       name: error instanceof Error ? error.name : "Unknown",

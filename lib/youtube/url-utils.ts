@@ -73,16 +73,28 @@ export function cleanRadioMixUrl(url: string): {
 
 /**
  * Helper to check if URL is a video or playlist
+ * Prioritizes playlist URLs when both video and playlist IDs are present
  */
 export function isPlaylistUrl(url: string): boolean {
+  console.log(`[YouTube URL Utils] Checking if URL is playlist: ${url}`);
   const playlistId = extractPlaylistId(url);
-  const videoId = extractVideoId(url);
-
-  // If has playlist ID but no video ID, it's a playlist
-  // If has both, treat as single video (common in YouTube Music)
-  return !!playlistId && !videoId;
+  console.log(`[YouTube URL Utils] Extracted playlist ID: ${playlistId}`);
+  
+  // If has playlist ID, treat as playlist (even if has video ID)
+  // Exception: Radio/mix playlists which should be treated as single videos
+  if (playlistId) {
+    const isRadioMix = playlistId.startsWith("RD");
+    console.log(`[YouTube URL Utils] Is radio/mix playlist: ${isRadioMix}`);
+    return !isRadioMix;
+  }
+  
+  console.log(`[YouTube URL Utils] No playlist ID found, returning false`);
+  return false;
 }
 
 export function isVideoUrl(url: string): boolean {
-  return !!extractVideoId(url);
+  console.log(`[YouTube URL Utils] Checking if URL is video: ${url}`);
+  const result = !!extractVideoId(url);
+  console.log(`[YouTube URL Utils] Is video URL: ${result}`);
+  return result;
 }

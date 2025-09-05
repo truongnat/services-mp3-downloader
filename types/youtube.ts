@@ -18,6 +18,8 @@ export interface YouTubeTrackInfo {
   size?: string;
   bitrate?: string;
   format?: string;
+  // Add the full info object for downloadFromInfo
+  fullInfo?: any;
 }
 
 export interface YouTubePlaylistApiResponse {
