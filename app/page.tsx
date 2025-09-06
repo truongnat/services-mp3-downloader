@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { SoundCloudIcon, YouTubeIcon, SettingsIcon } from "@/components/icons";
@@ -11,7 +11,6 @@ import PlaylistDownloaderYouTube from "./PlaylistDownloaderYouTube";
 
 export default function Home() {
   const [disableTabs, setDisableTabs] = useState(false);
-
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-4 sm:p-8 lg:p-24">
